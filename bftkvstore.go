@@ -1,7 +1,12 @@
 package main
 
-import "fmt"
+import (
+	"bftkvstore/api"
+	"fmt"
+)
 
 func main() {
 	fmt.Println("Hello, World!")
+
+	api.Start()
 }
