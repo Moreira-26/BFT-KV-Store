@@ -1,59 +1,48 @@
 package protocol
 
 import (
-	"bufio"
 	"fmt"
+	"log"
 	"net"
 )
 
 const (
-	PORT = "8089"
+	// server api
+	PING    = "PING" // Just a PING message
+	CONNECT = "CONN" // Expects 2 arguments -> address and port
+	// user api
+	NEW = "/new" // Adds a new key to the database, expects a type
+	INC = "/inc" // Increments a value in the database
 )
 
-func handleConnection(conn net.Conn) {
-	reader := bufio.NewReader(conn)
+func parseMsg(msg string, conn net.Conn) {
+	var header = msg[:4]
+	var body = func() string { return msg[4:] }
 
-	var msg []byte
-
-	data := make([]byte, 64)
-
-	for {
-		sz, err := reader.Read(data)
-
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-
-		for i := range sz {
-			msg = append(msg, data[i])
-		}
-
-		// Check if there is any more data to read
-		if reader.Buffered() == 0 {
-			break
-		}
+	switch header {
+	case PING:
+		pingMsg(conn)
+	case NEW:
+		log.Println("TODO: NEW- msg")
+	case CONNECT:
+		connectMsg(conn, body())
 	}
 
-	// TODO: Response
-	conn.Write([]byte("Hello World"))
-
-	conn.Close()
+	if conn.Close() != nil {
+		log.Println("Failed to close a connection")
+	}
 }
 
-func Start() {
-	// TODO: How nodes will communicate with each other
+func pingMsg(conn net.Conn) {
+	conn.Write([]byte("PONG"))
+}
 
-	ln, err := net.Listen("tcp", ":"+PORT)
+func connectMsg(conn net.Conn, msg string) {
+	// TODO: Connect to another node
+	fmt.Println(msg)
+	conn.Write([]byte("Not yet Implemented"))
+}
 
-	if err != nil {
-		// handle error
-	}
-	for {
-		conn, err := ln.Accept()
-		if err != nil {
-			// handle error
-		}
-		go handleConnection(conn)
-	}
+func newMsg(conn net.Conn, msg string) {
+	// TODO: Expects a type
 }

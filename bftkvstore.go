@@ -1,15 +1,36 @@
 package main
 
 import (
-	"bftkvstore/api"
 	"bftkvstore/protocol"
+	"bftkvstore/utils"
 	"fmt"
+	"log"
+	"os"
 )
 
+var serverPort string
+var serverHostname string
+
 func main() {
-	fmt.Println("Hello, World!")
+	argsWithoutProg := os.Args[1:]
 
-	go protocol.Start()
+	serverHostname = utils.GetOutboundIP().String()
+	if len(argsWithoutProg) > 0 {
+		serverPort = argsWithoutProg[0]
+	} else {
+		serverPort = "8089"
+	}
 
-	api.Start()
+	if serverPort == "" {
+		fmt.Println("A server port must be specified")
+		os.Exit(1)
+	}
+
+	log.Printf("Server started: %s:%s\n", serverHostname, serverPort)
+
+	go protocol.ReceiverStart(serverPort)
+
+	for {
+		// wait for end
+	}
 }
