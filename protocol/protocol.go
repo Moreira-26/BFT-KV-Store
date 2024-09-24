@@ -23,7 +23,7 @@ func parseMsg(msg string, conn net.Conn) {
 	case PING:
 		pingMsg(conn)
 	case NEW:
-		log.Println("TODO: NEW- msg")
+		newMsg(conn, body())
 	case CONNECT:
 		connectMsg(conn, body())
 	}
@@ -37,12 +37,13 @@ func pingMsg(conn net.Conn) {
 	conn.Write([]byte("PONG"))
 }
 
-func connectMsg(conn net.Conn, msg string) {
+func connectMsg(conn net.Conn, body string) {
 	// TODO: Connect to another node
-	fmt.Println(msg)
+	fmt.Println(body)
 	conn.Write([]byte("Not yet Implemented"))
 }
 
-func newMsg(conn net.Conn, msg string) {
+func newMsg(conn net.Conn, body string) {
 	// TODO: Expects a type
+	conn.Write([]byte("Not yet Implemented"))
 }
