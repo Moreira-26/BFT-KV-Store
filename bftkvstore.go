@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bftkvstore/context"
 	"bftkvstore/protocol"
 	"bftkvstore/utils"
 	"fmt"
@@ -21,14 +22,18 @@ func main() {
 		serverPort = "8089"
 	}
 
-	if serverPort == "" {
-		fmt.Println("A server port must be specified")
-		os.Exit(1)
-	}
-
 	log.Printf("Server started: %s:%s\n", serverHostname, serverPort)
 
-	go protocol.ReceiverStart(serverPort)
+	var ctx context.AppContext = context.AppContext{
+		Address: serverHostname,
+		Port: serverPort,
+		Nodes: make([]struct {
+			Address string
+			Port    string
+		}, 0),
+	}
+
+	go protocol.ReceiverStart(&ctx, serverPort)
 
 	for {
 		// wait for end

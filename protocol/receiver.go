@@ -1,15 +1,16 @@
 package protocol
 
 import (
+	"bftkvstore/context"
 	"bufio"
-	"fmt"
+	"log"
 	"net"
 )
 
-func handleConnection(conn net.Conn) {
-	reader := bufio.NewReader(conn)
+const READER_SIZE = 1000
 
-	var msg []byte
+func ReadFromConnection(conn net.Conn) (msg []byte, err error) {
+	reader := bufio.NewReader(conn)
 
 	data := make([]byte, 1000)
 
@@ -17,8 +18,7 @@ func handleConnection(conn net.Conn) {
 		sz, err := reader.Read(data)
 
 		if err != nil {
-			fmt.Println(err)
-			return
+			return nil, err
 		}
 
 		for i := range sz {
@@ -31,10 +31,23 @@ func handleConnection(conn net.Conn) {
 		}
 	}
 
-	parseMsg(string(msg), conn)
+	return msg, nil
 }
 
-func ReceiverStart(port string) {
+func handleConnection(ctx *context.AppContext, conn net.Conn) {
+	payload, err := ReadFromConnection(conn)
+	if err != nil {
+		return
+	}
+
+	Router(ctx, conn, MessageFromPayload(payload))
+
+	if conn.Close() != nil {
+		log.Println("Failed to close a connection")
+	}
+}
+
+func ReceiverStart(ctx *context.AppContext, port string) {
 	ln, err := net.Listen("tcp", ":"+port)
 
 	if err != nil {
@@ -44,7 +57,8 @@ func ReceiverStart(port string) {
 		conn, err := ln.Accept()
 		if err != nil {
 			// handle error
+			continue
 		}
-		go handleConnection(conn)
+		go handleConnection(ctx, conn)
 	}
 }
