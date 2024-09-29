@@ -4,7 +4,6 @@ import (
 	"bftkvstore/context"
 	"bftkvstore/protocol"
 	"bftkvstore/utils"
-	"fmt"
 	"log"
 	"os"
 )
