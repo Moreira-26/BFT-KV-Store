@@ -22,8 +22,8 @@ const (
 	NO        MessageHeader = "R_NO"
 
 	// user api
-	NEW MessageHeader = "/new" // Adds a new key to the database, expects a type
-	INC MessageHeader = "/inc" // Increments a value in the database
+	API_NEW MessageHeader = "/new" // Adds a new key to the database, expects a type
+	API_INC MessageHeader = "/inc" // Increments a value in the database
 )
 
 var EMPTYBODY struct{} = struct{}{}
