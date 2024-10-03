@@ -40,7 +40,10 @@ func handleConnection(ctx *context.AppContext, conn net.Conn) {
 		return
 	}
 
-	Router(ctx, conn, MessageFromPayload(payload))
+	msg, ok := MessageFromPayload(payload)
+	if ok {
+		Router(ctx, conn, msg)
+	}
 
 	if conn.Close() != nil {
 		log.Println("Failed to close a connection")

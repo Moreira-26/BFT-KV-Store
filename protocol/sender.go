@@ -28,5 +28,7 @@ func ConnectTo(ownAddress string, ownPort string, targetAddress string, targetPo
 		return false
 	}
 
-	return MessageFromPayload(res).Header == OK
+	msg_parsed, ok := MessageFromPayload(res)
+
+	return ok && msg_parsed.Header == OK
 }

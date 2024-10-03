@@ -40,14 +40,19 @@ func NewMessage(header MessageHeader) Message {
 	}
 }
 
-func MessageFromPayload(payload []byte) Message {
+func MessageFromPayload(payload []byte) (msg Message, ok bool) {
+	if len(payload) < 4 {
+		log.Println("Failed to parse payload into message due to the payload being too short")
+		return msg, false
+	}
+
 	var header = MessageHeader(payload[:4])
 	var content = payload[4:]
 
 	return Message{
 		Header:  header,
 		Content: content,
-	}
+	}, true
 }
 
 func (msg Message) AddContent(content interface{}) (Message, error) {
