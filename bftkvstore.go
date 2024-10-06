@@ -1,31 +1,51 @@
 package main
 
 import (
+	"bftkvstore/config"
 	"bftkvstore/context"
 	"bftkvstore/protocol"
 	"bftkvstore/utils"
+	"flag"
+	"fmt"
 	"log"
-	"os"
 )
 
-var serverPort string
 var serverHostname string
+var serverPortPtr *string
+var configPathPtr *string
+
+func init() {
+	serverHostname = utils.GetOutboundIP().String()
+	serverPortPtr = flag.String("port", "8089", "specifies which port must be used by the application")
+	configPathPtr = flag.String("config", "bftkvstore.toml", "specifies the path for a configuration file")
+}
 
 func main() {
-	argsWithoutProg := os.Args[1:]
+	flag.Parse()
+	flagset := make(map[string]bool)
+	flag.Visit(func(f *flag.Flag) { flagset[f.Name] = true })
 
-	serverHostname = utils.GetOutboundIP().String()
-	if len(argsWithoutProg) > 0 {
-		serverPort = argsWithoutProg[0]
+	var nodeConfig config.ConfigData
+
+	if flagset["config"] { // config was set
+		var err error
+		nodeConfig, err = config.ReadConfig(*configPathPtr)
+		if err != nil {
+			log.Fatal(err.Error())
+		}
 	} else {
-		serverPort = "8089"
+		nodeConfig = config.WriteConfig()
 	}
+
+	var serverPort string = *serverPortPtr
 
 	log.Printf("Server started: %s:%s\n", serverHostname, serverPort)
 
 	var ctx context.AppContext = context.AppContext{
-		Address: serverHostname,
-		Port: serverPort,
+		Secretkey: nodeConfig.Sk,
+		Publickey: nodeConfig.Pk,
+		Address:   serverHostname,
+		Port:      serverPort,
 		Nodes: make([]struct {
 			Address string
 			Port    string

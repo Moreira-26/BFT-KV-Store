@@ -1,4 +1,4 @@
-package main
+package crdts
 
 import (
 	"crypto/sha256"
@@ -147,26 +147,3 @@ func (p *PNCounter) GetValue() int {
 	}
 	return totalPos - totalNeg
 }
-
-// func main() {
-// 	//Node1 Creates PNCounter
-// 	node1PN := NewPNCounter("node1")
-
-// 	//Node2 Receives Create
-// 	node2PN := NewPNCounterID("node1", node1PN.ID)
-
-// 	//Node1 Create update
-// 	update1 := node1PN.generateUpdate("node1", "inc", 5) // node1 increments by 5
-// 	//Node2 Create update
-// 	update2 := node2PN.generateUpdate("node2", "dec", 3) // node2 decrements by 3
-
-// 	//Simulates node1 --update1-> node2
-// 	node2PN.effect(update1)
-
-// 	//Simulates node2 --update2-> node1
-// 	node1PN.effect(update2)
-// 	node1PN.effect(update2)
-
-// 	fmt.Printf("Node1 Value: %d\n", node1PN.GetValue())
-// 	fmt.Printf("Node2 Value: %d\n", node2PN.GetValue())
-// }

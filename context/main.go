@@ -1,15 +1,22 @@
 package context
 
-import "sync"
+import (
+	"bftkvstore/storage"
+	"crypto/rsa"
+	"sync"
+)
 
 type AppContext struct {
-	lock    sync.Mutex
-	Address string
-	Port    string
-	Nodes   []struct {
+	lock      sync.Mutex
+	Secretkey *rsa.PrivateKey
+	Publickey *rsa.PublicKey
+	Address   string
+	Port      string
+	Nodes     []struct {
 		Address string
 		Port    string
 	}
+	Storage storage.Storage
 }
 
 func (ctx *AppContext) AddNewNode(address string, port string) {
