@@ -49,7 +49,6 @@ func main() {
 
 	var ctx context.AppContext = context.AppContext{
 		Secretkey: nodeConfig.Sk,
-		Publickey: nodeConfig.Pk,
 		Address:   serverHostname,
 		Port:      serverPort,
 		Nodes: make([]struct {

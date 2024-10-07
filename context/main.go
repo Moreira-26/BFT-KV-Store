@@ -2,14 +2,13 @@ package context
 
 import (
 	"bftkvstore/storage"
-	"crypto/rsa"
+	"crypto/ed25519"
 	"sync"
 )
 
 type AppContext struct {
 	lock      sync.Mutex
-	Secretkey *rsa.PrivateKey
-	Publickey *rsa.PublicKey
+	Secretkey ed25519.PrivateKey
 	Address   string
 	Port      string
 	Nodes     []struct {
