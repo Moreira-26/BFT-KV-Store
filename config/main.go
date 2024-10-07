@@ -76,9 +76,7 @@ func ReadConfig(path string) (config ConfigData, err error) {
 	}, nil
 }
 
-func WriteConfig() (config ConfigData) {
-	var folder string = "./.kvstoreconfig/"
-
+func WriteConfig(folder string) (config ConfigData) {
 	os.MkdirAll(folder, os.ModePerm)
 
 	// generate key
@@ -95,7 +93,7 @@ func WriteConfig() (config ConfigData) {
 		Type:  "RSA PRIVATE KEY",
 		Bytes: secretKeyBytes,
 	}
-	secretPem, err := os.Create(folder + "private.pem")
+	secretPem, err := os.Create(folder + "/private.pem")
 	if err != nil {
 		fmt.Printf("error when create private.pem: %s \n", err)
 		os.Exit(1)
@@ -116,7 +114,7 @@ func WriteConfig() (config ConfigData) {
 		Type:  "PUBLIC KEY",
 		Bytes: publicKeyBytes,
 	}
-	publicPem, err := os.Create(folder + "public.pem")
+	publicPem, err := os.Create(folder + "/public.pem")
 	if err != nil {
 		fmt.Printf("error when create public.pem: %s \n", err)
 		os.Exit(1)

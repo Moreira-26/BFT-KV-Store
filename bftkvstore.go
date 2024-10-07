@@ -8,6 +8,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"os"
 )
 
 var serverHostname string
@@ -17,27 +18,32 @@ var configPathPtr *string
 func init() {
 	serverHostname = utils.GetOutboundIP().String()
 	serverPortPtr = flag.String("port", "8089", "specifies which port must be used by the application")
-	configPathPtr = flag.String("config", "bftkvstore.toml", "specifies the path for a configuration file")
+	configPathPtr = flag.String("config", ".kvstoreconfig", "specifies the path for a configuration file")
 }
 
 func main() {
 	flag.Parse()
-	flagset := make(map[string]bool)
-	flag.Visit(func(f *flag.Flag) { flagset[f.Name] = true })
-
-	var nodeConfig config.ConfigData
-
-	if flagset["config"] { // config was set
-		var err error
-		nodeConfig, err = config.ReadConfig(*configPathPtr)
-		if err != nil {
-			log.Fatal(err.Error())
-		}
-	} else {
-		nodeConfig = config.WriteConfig()
-	}
 
 	var serverPort string = *serverPortPtr
+	var configPath string = *configPathPtr
+
+	var nodeConfig config.ConfigData
+	configFolderInfo, findConfigFolderErr := os.Stat(*configPathPtr)
+
+	if os.IsNotExist(findConfigFolderErr) {
+		log.Printf("No configuration exists on path %s. Creating a new one.\n", configPath)
+		nodeConfig = config.WriteConfig(configPath)
+		log.Printf("Configuration %s created successfully\n", configPath)
+	} else if !configFolderInfo.IsDir() {
+		log.Fatalln(fmt.Sprintf("The provided configuration path %s should be a folder.\n", *configPathPtr))
+	} else {
+		var err error
+		nodeConfig, err = config.ReadConfig(configPath)
+		if err != nil {
+			log.Fatalln(err.Error())
+		}
+		log.Printf("Configuration %s read successfully\n", configPath)
+	}
 
 	log.Printf("Server started: %s:%s\n", serverHostname, serverPort)
 
