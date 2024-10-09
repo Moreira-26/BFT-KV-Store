@@ -27,25 +27,39 @@ func hashOperation(op []byte) string {
 	return hex.EncodeToString(hash[:])
 }
 
-func newCounterOp(secretkey ed25519.PrivateKey, crdt MyCounter) ([]byte, error) {
+func newCounterOp(secretkey ed25519.PrivateKey, val int) ([]byte, error) {
 	return SignOp(secretkey, MyOperation{
 		Op:    "new",
 		Preds: make([]string, 0),
-		Crdt:  crdt,
+		Crdt:  MyCounter{Val: val},
 		Type:  "counter",
 	})
 }
 
-func modifyCounterOp(secretkey ed25519.PrivateKey, crdt MyCounter, preds []signedOperation) ([]byte, error) {
+func incCounterOp(secretkey ed25519.PrivateKey, val int, preds []signedOperation) ([]byte, error) {
 	var hashed_preds []string = make([]string, len(preds))
 	for idx, pred := range preds {
 		hashed_preds[idx] = hashOperation(pred)
 	}
 
 	return SignOp(secretkey, MyOperation{
-		Op:    "modify",
+		Op:    "inc",
 		Preds: hashed_preds,
-		Crdt:  crdt,
+		Crdt:  MyCounter{Val: val},
+		Type:  "counter",
+	})
+}
+
+func decCounterOp(secretkey ed25519.PrivateKey, val int, preds []signedOperation) ([]byte, error) {
+	var hashed_preds []string = make([]string, len(preds))
+	for idx, pred := range preds {
+		hashed_preds[idx] = hashOperation(pred)
+	}
+
+	return SignOp(secretkey, MyOperation{
+		Op:    "dec",
+		Preds: hashed_preds,
+		Crdt:  MyCounter{Val: val},
 		Type:  "counter",
 	})
 }
@@ -89,49 +103,123 @@ type GraphNode struct {
 	value MyOperation
 	preds []string
 	succs []string
+	tier  int
 }
 
-func CalculateOperations(signedops []signedOperation) {
+type operationCalculationResult struct {
+	heads        []string
+	value        interface{}
+	predsMissing []string
+}
+
+func calculateOperations(signedops []signedOperation, crdtType string) operationCalculationResult {
 	validOperations := make(map[string]MyOperation)
 	for _, signedop := range signedops {
 		readOp, err := readOperation(signedop)
+
+		if readOp.Type != crdtType {
+			fmt.Println("Found operation of wrong type when calculating")
+			continue
+		}
+
 		if err == nil {
 			validOperations[hashOperation(signedop)] = readOp
 		}
 	}
 
+	predecessorsMissing := make([]string, 0)
+
 	// This loop removes every operation that has an invalid op as predecessor
-	deleted := false
+	iteration := 0
 	for {
-		deleted = false
+		iteration += 1
+		keysToDelete := make(map[string]bool)
 
 		for key, validOpVal := range validOperations {
 			for _, pred := range validOpVal.Preds {
 				_, exists := validOperations[pred]
 
 				if !exists {
-					fmt.Println("A precedence does not exist, deleting", key)
-					delete(validOperations, key)
-					deleted = true
-					break
+					fmt.Println("Invalid predecessor, deleting", key)
+					if iteration == 1 {
+						predecessorsMissing = append(predecessorsMissing, pred)
+					}
+					keysToDelete[key] = true
 				}
 			}
 		}
 
-		if !deleted {
+		if len(keysToDelete) == 0 {
 			break
+		} else {
+			for key, _ := range keysToDelete {
+				delete(validOperations, key)
+			}
+		}
+
+	}
+
+	var hashGraph map[string]GraphNode = make(map[string]GraphNode)
+
+	for key, _ := range validOperations {
+		_, exists := hashGraph[key]
+
+		if !exists {
+			propagNode(hashGraph, validOperations, key, 0)
 		}
 	}
 
-	fmt.Println(len(validOperations))
+	// nodes with tier 0 are the ones that are the most recent ones
+	var heads []string = make([]string, 0)
+	var value float64 = 0
 
-	// Build Graph
+	for k, v := range hashGraph {
+		if v.tier == 0 {
+			heads = append(heads, k)
+		}
 
-	// Check what nodes are not fully connected
+		switch crdtType {
+		case "counter":
+			{
+				if v.value.Op == "new" || v.value.Op == "inc" {
+					value += v.value.Crdt.(map[string]interface{})["Val"].(float64)
+				} else if v.value.Op == "dec" {
+					value -= v.value.Crdt.(map[string]interface{})["Val"].(float64)
+				}
+			}
+		}
+	}
 
-	// Remove every node after
+	return operationCalculationResult{heads: heads, value: value, predsMissing: predecessorsMissing}
+}
 
-	// check if every predecessor exists
+func propagNode(graph map[string]GraphNode, validOps map[string]MyOperation, key string, tier int) {
+	gNode, exists := graph[key]
+
+	if !exists {
+		graph[key] = GraphNode{
+			value: validOps[key],
+			tier:  tier,
+		}
+	} else {
+		if tier > gNode.tier {
+			gNode.tier = tier
+			graph[key] = gNode
+		}
+	}
+
+	for _, predKey := range validOps[key].Preds {
+		propagNode(graph, validOps, predKey, tier+1)
+
+		predGNode, _ := graph[predKey]
+
+		predGNode.succs = append(graph[predKey].succs, key)
+		graph[predKey] = predGNode
+
+		gNode, _ = graph[key]
+		gNode.preds = append(gNode.preds, predKey)
+		graph[key] = gNode
+	}
 }
 
 func TestUtf8(t *testing.T) {
@@ -173,17 +261,20 @@ func TestHelloName(t *testing.T) {
 		_, keys[name], _ = ed25519.GenerateKey(rand.Reader)
 	}
 
-	var userACounter MyCounter = MyCounter{Val: 0}
-
-	op0, err := newCounterOp(keys["john"], userACounter)
-	op1, err := modifyCounterOp(keys["alice"], MyCounter{Val: 4}, []signedOperation{op0})
-	op2, err := modifyCounterOp(keys["john"], MyCounter{Val: 3}, []signedOperation{op0})
-	op3, err := modifyCounterOp(keys["alice"], MyCounter{Val: 5}, []signedOperation{op1, op2})
-	op4, err := modifyCounterOp(keys["alice"], MyCounter{Val: 7}, []signedOperation{op3})
-	op5, err := modifyCounterOp(keys["john"], MyCounter{Val: 1}, []signedOperation{op4})
+	op0, err := newCounterOp(keys["john"], 0)
+	op1, err := incCounterOp(keys["alice"], 4, []signedOperation{op0})
+	op2, err := decCounterOp(keys["john"], 3, []signedOperation{op0})
+	op3, err := incCounterOp(keys["alice"], 5, []signedOperation{op1, op2})
+	op4, err := incCounterOp(keys["alice"], 7, []signedOperation{op3})
+	op5, err := incCounterOp(keys["john"], 1, []signedOperation{op4})
+	op6, err := decCounterOp(keys["john"], 3, []signedOperation{op4})
 	checkErr(t, err)
 
-	CalculateOperations([]signedOperation{op0, op4, op1, op3, op5})
+	result := calculateOperations([]signedOperation{op0, op2, op1, op4, op3, op6, op5, op6}, "counter")
+
+	fmt.Println("heads:", result.heads)
+	fmt.Println("value:", result.value)
+	fmt.Println("predecessors missing:", result.predsMissing)
 
 	t.Fail()
 }
