@@ -69,6 +69,7 @@ type OpCalcResult struct {
 	predsMissing []string
 }
 
+// TODO: Check if the new operation exists
 func CalculateOperations(signedops []SignedOperation, crdtType string) OpCalcResult {
 	validOperations := make(map[string]Operation)
 	for _, signedop := range signedops {
@@ -126,7 +127,7 @@ func CalculateOperations(signedops []SignedOperation, crdtType string) OpCalcRes
 		}
 	}
 
-	// nodes with tier 0 are the ones that are the most recent ones
+	// nodes with tier 0 are the most recent
 	var heads []string = make([]string, 0)
 	var value float64 = 0
 
