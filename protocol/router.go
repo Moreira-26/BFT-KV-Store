@@ -17,9 +17,12 @@ func Router(ctx *context.AppContext, conn net.Conn, msg Message) {
 
 	// user api
 	case API_NEW:
-		newMsg(conn, msg.Content)
+		newMsg(ctx, conn, msg.Content)
+	case API_GET:
+		readMsg(ctx, conn, msg.Content)
+	case API_INC:
+		incMsg(ctx, conn, msg.Content)
 	default:
-		// SendString(conn, CmdNotFoundError(header))
 	}
 }
 

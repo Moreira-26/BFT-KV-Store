@@ -64,24 +64,27 @@ type graphNode struct {
 }
 
 type OpCalcResult struct {
-	heads        []string
-	value        interface{}
-	predsMissing []string
+	Heads        []SignedOperation
+	Value        interface{}
+	PredsMissing []string
+	Type         string
 }
 
 // TODO: Check if the new operation exists
 func CalculateOperations(signedops []SignedOperation, crdtType string) OpCalcResult {
 	validOperations := make(map[string]Operation)
+	signedOperations := make(map[string]SignedOperation)
 	for _, signedop := range signedops {
 		readOp, err := ReadOperation(signedop)
 
 		if readOp.Type != crdtType {
-			log.Println("Found operation of wrong type when calculating")
+			log.Println("Found operation of wrong type when calculating:", readOp.Type, "!=", crdtType, readOp)
 			continue
 		}
 
 		if err == nil {
 			validOperations[HashOperation(signedop)] = readOp
+			signedOperations[HashOperation(signedop)] = signedop
 		}
 	}
 
@@ -114,7 +117,6 @@ func CalculateOperations(signedops []SignedOperation, crdtType string) OpCalcRes
 				delete(validOperations, key)
 			}
 		}
-
 	}
 
 	hashGraph := make(map[string]graphNode)
@@ -128,12 +130,12 @@ func CalculateOperations(signedops []SignedOperation, crdtType string) OpCalcRes
 	}
 
 	// nodes with tier 0 are the most recent
-	var heads []string = make([]string, 0)
+	var heads []SignedOperation = make([]SignedOperation, 0)
 	var value float64 = 0
 
 	for k, v := range hashGraph {
 		if v.tier == 0 {
-			heads = append(heads, k)
+			heads = append(heads, signedOperations[k])
 		}
 
 		switch crdtType {
@@ -148,7 +150,7 @@ func CalculateOperations(signedops []SignedOperation, crdtType string) OpCalcRes
 		}
 	}
 
-	return OpCalcResult{heads: heads, value: value, predsMissing: predecessorsMissing}
+	return OpCalcResult{Heads: heads, Value: value, PredsMissing: predecessorsMissing, Type: crdtType}
 }
 
 func propagateNode(graph map[string]graphNode, validOps map[string]Operation, key string, tier int) {

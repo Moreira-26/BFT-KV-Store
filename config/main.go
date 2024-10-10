@@ -7,6 +7,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 )
 
@@ -62,7 +63,7 @@ func WriteConfig(folder string) (config ConfigData) {
 	_, secretkey, err := ed25519.GenerateKey(rand.Reader)
 	// generate key
 	if err != nil {
-		fmt.Printf("Cannot generate private and public keys\n")
+		log.Printf("Cannot generate private and public keys\n")
 		os.Exit(1)
 	}
 
@@ -75,12 +76,12 @@ func WriteConfig(folder string) (config ConfigData) {
 	}
 	secretPem, err := os.Create(folder + "/private.pem")
 	if err != nil {
-		fmt.Printf("error when create private.pem: %s \n", err)
+		log.Printf("error when create private.pem: %s \n", err)
 		os.Exit(1)
 	}
 	err = pem.Encode(secretPem, secretKeyBlock)
 	if err != nil {
-		fmt.Printf("error when encode private pem: %s \n", err)
+		log.Printf("error when encode private pem: %s \n", err)
 		os.Exit(1)
 	}
 

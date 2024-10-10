@@ -47,15 +47,7 @@ func main() {
 
 	log.Printf("Server started: %s:%s\n", serverHostname, serverPort)
 
-	var ctx context.AppContext = context.AppContext{
-		Secretkey: nodeConfig.Sk,
-		Address:   serverHostname,
-		Port:      serverPort,
-		Nodes: make([]struct {
-			Address string
-			Port    string
-		}, 0),
-	}
+	var ctx context.AppContext = context.New(nodeConfig.Sk, serverHostname, serverPort)
 
 	go protocol.ReceiverStart(&ctx, serverPort)
 

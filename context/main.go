@@ -18,6 +18,19 @@ type AppContext struct {
 	Storage storage.Storage
 }
 
+func New(secretkey ed25519.PrivateKey, hostname string, port string) AppContext {
+	return AppContext{
+		Secretkey: secretkey,
+		Address:   hostname,
+		Port:      port,
+		Nodes: make([]struct {
+			Address string
+			Port    string
+		}, 0),
+		Storage: storage.Init(),
+	}
+}
+
 func (ctx *AppContext) AddNewNode(address string, port string) {
 	ctx.lock.Lock()
 	defer ctx.lock.Unlock()
