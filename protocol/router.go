@@ -22,6 +22,8 @@ func Router(ctx *context.AppContext, conn net.Conn, msg Message) {
 		readMsg(ctx, conn, msg.Content)
 	case API_INC:
 		incMsg(ctx, conn, msg.Content)
+	case API_DEC:
+		decMsg(ctx, conn, msg.Content)
 	default:
 	}
 }
