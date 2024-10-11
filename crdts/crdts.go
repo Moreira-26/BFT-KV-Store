@@ -48,7 +48,7 @@ func createCrdtOp(crdtType CRDT_TYPE, secretkey ed25519.PrivateKey) (op []byte, 
 		Preds: make([]string, 0),
 		Crdt:  nil,
 		Nonce: nonce,
-		Type:  CRDT_COUNTER,
+		Type:  crdtType,
 	})
 
 	if err != nil {

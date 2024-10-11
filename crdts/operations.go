@@ -132,26 +132,24 @@ func CalculateOperations(signedops []SignedOperation, crdtType CRDT_TYPE) OpCalc
 
 	// nodes with tier 0 are the most recent
 	var heads []SignedOperation = make([]SignedOperation, 0)
-	var value float64 = 0
+
+	var reducer opReducerI
+	switch crdtType {
+	case CRDT_COUNTER:
+		reducer = &counterReducer{result: 0}
+	case CRDT_GSET:
+		reducer = &gSetReducer{result: make(map[any]bool)}
+	}
 
 	for k, v := range hashGraph {
 		if v.tier == 0 {
 			heads = append(heads, signedOperations[k])
 		}
 
-		switch crdtType {
-		case CRDT_COUNTER:
-			{
-				if v.value.Op == "inc" {
-					value += v.value.Crdt.(map[string]interface{})["value"].(float64)
-				} else if v.value.Op == "dec" {
-					value -= v.value.Crdt.(map[string]interface{})["value"].(float64)
-				}
-			}
-		}
+		reducer.add(v)
 	}
 
-	return OpCalcResult{Heads: heads, Value: value, PredsMissing: predecessorsMissing, Type: crdtType}
+	return OpCalcResult{Heads: heads, Value: reducer.value(), PredsMissing: predecessorsMissing, Type: crdtType}
 }
 
 func propagateNode(graph map[string]graphNode, validOps map[string]Operation, key string, tier int) {
@@ -181,4 +179,39 @@ func propagateNode(graph map[string]graphNode, validOps map[string]Operation, ke
 		gNode.preds = append(gNode.preds, predKey)
 		graph[key] = gNode
 	}
+}
+
+type opReducerI interface {
+	add(node graphNode)
+	value() any
+}
+
+type counterReducer struct{ result float64 }
+
+func (r *counterReducer) add(node graphNode) {
+	if node.value.Op == "inc" {
+		r.result += node.value.Crdt.(map[string]interface{})["value"].(float64)
+	} else if node.value.Op == "dec" {
+		r.result -= node.value.Crdt.(map[string]interface{})["value"].(float64)
+	}
+}
+
+type gSetReducer struct{ result map[any]bool }
+
+func (r *gSetReducer) add(node graphNode) {
+	if node.value.Op == "add" {
+		val := node.value.Crdt.(map[string]interface{})["value"]
+		r.result[val] = true
+	}
+}
+
+func (r *counterReducer) value() any {
+	return r.result
+}
+func (r *gSetReducer) value() any {
+	keys := make([]any, 0)
+	for k, _ := range r.result {
+		keys = append(keys, k)
+	}
+	return keys
 }

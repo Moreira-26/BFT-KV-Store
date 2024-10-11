@@ -80,6 +80,15 @@ func readMsg(ctx *context.AppContext, conn net.Conn, body []byte) {
 	}
 }
 
+func storeOperation(ctx *context.AppContext, conn net.Conn, key string, op []byte) bool {
+	if err := ctx.Storage.Append(key, op); err != nil {
+		log.Println("Failed to create operation on key", key, "due to:", err)
+		return false
+	} else {
+		return true
+	}
+}
+
 func incMsg(ctx *context.AppContext, conn net.Conn, body []byte) {
 	type readMsgBody struct {
 		Key   string `json:"key"`
@@ -101,30 +110,21 @@ func incMsg(ctx *context.AppContext, conn net.Conn, body []byte) {
 		return
 	}
 
+	invalid := false
+	var incOp []byte
+
 	switch resultObject.Type {
 	case crdts.CRDT_COUNTER:
-		failed := false
-
-		incOp, err := crdts.IncCounterOp(ctx.Secretkey, data.Value, resultObject.Heads)
-		if err != nil {
-			failed = true
-		}
-
-		err = ctx.Storage.Append(data.Key, incOp)
-		if err != nil {
-			failed = true
-		} else {
-			NewMessage(OK).Send(conn)
-		}
-
-		if failed {
-			log.Println("Failed to create counter inc operation on key", data.Key)
-		} else {
-			return
-		}
+		incOp, err = crdts.IncCounterOp(ctx.Secretkey, data.Value, resultObject.Heads)
+	default:
+		invalid = true
 	}
 
-	NewMessage(NO).Send(conn)
+	if !invalid && err == nil && storeOperation(ctx, conn, data.Key, incOp) {
+		NewMessage(OK).Send(conn)
+	} else {
+		NewMessage(NO).Send(conn)
+	}
 }
 
 func decMsg(ctx *context.AppContext, conn net.Conn, body []byte) {
@@ -148,28 +148,57 @@ func decMsg(ctx *context.AppContext, conn net.Conn, body []byte) {
 		return
 	}
 
+	invalid := false
+	var decOp []byte
+
 	switch resultObject.Type {
 	case crdts.CRDT_COUNTER:
-		failed := false
-
-		incOp, err := crdts.DecCounterOp(ctx.Secretkey, data.Value, resultObject.Heads)
-		if err != nil {
-			failed = true
-		}
-
-		err = ctx.Storage.Append(data.Key, incOp)
-		if err != nil {
-			failed = true
-		} else {
-			NewMessage(OK).Send(conn)
-		}
-
-		if failed {
-			log.Println("Failed to create counter inc operation on key", data.Key)
-		} else {
-			return
-		}
+		decOp, err = crdts.DecCounterOp(ctx.Secretkey, data.Value, resultObject.Heads)
+	default:
+		invalid = true
 	}
 
-	NewMessage(NO).Send(conn)
+	if !invalid && err == nil && storeOperation(ctx, conn, data.Key, decOp) {
+		NewMessage(OK).Send(conn)
+	} else {
+		NewMessage(NO).Send(conn)
+	}
+}
+
+func addMsg(ctx *context.AppContext, conn net.Conn, body []byte) {
+	type readMsgBody struct {
+		Key   string `json:"key"`
+		Value any    `json:"value"`
+	}
+
+	var data readMsgBody
+	err := json.Unmarshal(body, &data)
+	if err != nil {
+		log.Println("Error parsing read message", err)
+		NewMessage(NO).Send(conn)
+		return
+	}
+
+	resultObject, err := ctx.Storage.Get(data.Key)
+	if err != nil {
+		log.Println("Error getting item from key", err)
+		NewMessage(NO).Send(conn)
+		return
+	}
+
+	invalid := false
+	var addOp []byte
+
+	switch resultObject.Type {
+	case crdts.CRDT_GSET:
+		addOp, err = crdts.AddGSetOp(ctx.Secretkey, data.Value, resultObject.Heads)
+	default:
+		invalid = true
+	}
+
+	if !invalid && err == nil && storeOperation(ctx, conn, data.Key, addOp) {
+		NewMessage(OK).Send(conn)
+	} else {
+		NewMessage(NO).Send(conn)
+	}
 }
