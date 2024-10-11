@@ -28,7 +28,7 @@ func connectMsg(ctx *context.AppContext, conn net.Conn, body []byte) {
 		return
 	}
 
-	logger.Info("Received CONN message with arguments", fmt.Sprint(data))
+	logger.Info("Received CONN message with arguments", data)
 
 	if data.Address == "" || data.Port == "" {
 		sendString(conn, BadArgumentsError())
@@ -60,7 +60,7 @@ func qConnectMsg(ctx *context.AppContext, conn net.Conn, body []byte) {
 
 	err := json.Unmarshal(body, &data)
 	if err != nil {
-		logger.Error("parsing connect message", err.Error())
+		logger.Error("parsing connect message", err)
 		NewMessage(NO).Send(conn)
 		return
 	}

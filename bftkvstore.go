@@ -40,7 +40,7 @@ func main() {
 		var err error
 		nodeConfig, err = config.ReadConfig(configPath)
 		if err != nil {
-			logger.Fatal(err.Error())
+			logger.Fatal(err)
 		}
 		logger.Info(fmt.Sprintf("Configuration %s read successfully", configPath))
 	}

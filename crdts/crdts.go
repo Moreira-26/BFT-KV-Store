@@ -63,7 +63,7 @@ func NewCRDT(crdtType CRDT_TYPE, secretkey ed25519.PrivateKey) (op []byte, id []
 	if isValidCrdtType(crdtType) {
 		op, id, err = createCrdtOp(crdtType, secretkey)
 	} else {
-		err = errors.New(fmt.Sprint("There is no crdt of type", string(crdtType)))
+		err = errors.New(fmt.Sprint("There is no crdt of type", crdtType))
 	}
 
 	return

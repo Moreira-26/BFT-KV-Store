@@ -80,7 +80,7 @@ func CalculateOperations(signedops []SignedOperation, crdtType CRDT_TYPE) OpCalc
 		readOp, err := ReadOperation(signedop)
 
 		if readOp.Type != crdtType {
-			logger.Alert("Found operation of wrong type when calculating:", string(readOp.Type), "!=", string(crdtType), fmt.Sprint(readOp))
+			logger.Alert("Found operation of wrong type when calculating:", readOp.Type, "!=", crdtType, readOp)
 			continue
 		}
 
