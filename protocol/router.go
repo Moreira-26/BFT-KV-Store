@@ -26,6 +26,8 @@ func Router(ctx *context.AppContext, conn net.Conn, msg Message) {
 		decMsg(ctx, conn, msg.Content)
 	case API_ADD:
 		addMsg(ctx, conn, msg.Content)
+	case API_RMV:
+		rmvMsg(ctx, conn, msg.Content)
 	default:
 	}
 }

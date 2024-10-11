@@ -192,11 +192,51 @@ func addMsg(ctx *context.AppContext, conn net.Conn, body []byte) {
 	switch resultObject.Type {
 	case crdts.CRDT_GSET:
 		addOp, err = crdts.AddGSetOp(ctx.Secretkey, data.Value, resultObject.Heads)
+	case crdts.CRDT_2PSET:
+		addOp, err = crdts.AddTwoPhaseSetOp(ctx.Secretkey, data.Value, resultObject.Heads)
 	default:
 		invalid = true
 	}
 
 	if !invalid && err == nil && storeOperation(ctx, conn, data.Key, addOp) {
+		NewMessage(OK).Send(conn)
+	} else {
+		NewMessage(NO).Send(conn)
+	}
+}
+
+func rmvMsg(ctx *context.AppContext, conn net.Conn, body []byte) {
+	type readMsgBody struct {
+		Key   string `json:"key"`
+		Value any    `json:"value"`
+	}
+
+	var data readMsgBody
+	err := json.Unmarshal(body, &data)
+	if err != nil {
+		logger.Error("parsing read message", err)
+		NewMessage(NO).Send(conn)
+		return
+	}
+
+	resultObject, err := ctx.Storage.Get(data.Key)
+	if err != nil {
+		logger.Error("getting item from key", err)
+		NewMessage(NO).Send(conn)
+		return
+	}
+
+	invalid := false
+	var rmvOp []byte
+
+	switch resultObject.Type {
+	case crdts.CRDT_2PSET:
+		rmvOp, err = crdts.RemoveTwoPhaseSetOp(ctx.Secretkey, data.Value, resultObject.Heads)
+	default:
+		invalid = true
+	}
+
+	if !invalid && err == nil && storeOperation(ctx, conn, data.Key, rmvOp) {
 		NewMessage(OK).Send(conn)
 	} else {
 		NewMessage(NO).Send(conn)

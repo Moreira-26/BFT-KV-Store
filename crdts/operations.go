@@ -139,6 +139,8 @@ func CalculateOperations(signedops []SignedOperation, crdtType CRDT_TYPE) OpCalc
 		reducer = &counterReducer{result: 0}
 	case CRDT_GSET:
 		reducer = &gSetReducer{result: make(map[any]bool)}
+	case CRDT_2PSET:
+		reducer = &twoPhaseSetReducer{result: make(map[any]bool)}
 	}
 
 	for k, v := range hashGraph {
@@ -189,9 +191,10 @@ type opReducerI interface {
 type counterReducer struct{ result float64 }
 
 func (r *counterReducer) add(node graphNode) {
-	if node.value.Op == "inc" {
+	switch node.value.Op {
+	case "inc":
 		r.result += node.value.Crdt.(map[string]interface{})["value"].(float64)
-	} else if node.value.Op == "dec" {
+	case "dec":
 		r.result -= node.value.Crdt.(map[string]interface{})["value"].(float64)
 	}
 }
@@ -205,6 +208,23 @@ func (r *gSetReducer) add(node graphNode) {
 	}
 }
 
+type twoPhaseSetReducer struct{ result map[any]bool }
+
+func (r *twoPhaseSetReducer) add(node graphNode) {
+	switch node.value.Op {
+	case "add":
+		val := node.value.Crdt.(map[string]interface{})["value"]
+		res, exists := r.result[val]
+		if !exists {
+			res = true
+		}
+		r.result[val] = true && res
+	case "rmv":
+		val := node.value.Crdt.(map[string]interface{})["value"]
+		r.result[val] = false
+	}
+}
+
 func (r *counterReducer) value() any {
 	return r.result
 }
@@ -212,6 +232,15 @@ func (r *gSetReducer) value() any {
 	keys := make([]any, 0)
 	for k, _ := range r.result {
 		keys = append(keys, k)
+	}
+	return keys
+}
+func (r *twoPhaseSetReducer) value() any {
+	keys := make([]any, 0)
+	for k, v := range r.result {
+		if v {
+			keys = append(keys, k)
+		}
 	}
 	return keys
 }

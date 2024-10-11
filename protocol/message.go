@@ -27,6 +27,7 @@ const (
 	API_INC MessageHeader = "/inc" // Increments a value in the database
 	API_DEC MessageHeader = "/dec" // Decrements a value in the database
 	API_ADD MessageHeader = "/add" // Adds a value to the database
+	API_RMV MessageHeader = "/rmv" // Removes a value from the database
 )
 
 var EMPTYBODY struct{} = struct{}{}
