@@ -3,11 +3,11 @@ package main
 import (
 	"bftkvstore/config"
 	"bftkvstore/context"
+	"bftkvstore/logger"
 	"bftkvstore/protocol"
 	"bftkvstore/utils"
 	"flag"
 	"fmt"
-	"log"
 	"os"
 )
 
@@ -31,21 +31,21 @@ func main() {
 	configFolderInfo, findConfigFolderErr := os.Stat(*configPathPtr)
 
 	if os.IsNotExist(findConfigFolderErr) {
-		log.Printf("No configuration exists on path %s. Creating a new one.\n", configPath)
+		logger.Alert(fmt.Sprintf("No configuration exists on path %s. Creating a new one.", configPath))
 		nodeConfig = config.WriteConfig(configPath)
-		log.Printf("Configuration %s created successfully\n", configPath)
+		logger.Info(fmt.Sprintf("Configuration %s created successfully", configPath))
 	} else if !configFolderInfo.IsDir() {
-		log.Fatalln(fmt.Sprintf("The provided configuration path %s should be a folder.\n", *configPathPtr))
+		logger.Fatal(fmt.Sprintf("The provided configuration path %s should be a folder.", *configPathPtr))
 	} else {
 		var err error
 		nodeConfig, err = config.ReadConfig(configPath)
 		if err != nil {
-			log.Fatalln(err.Error())
+			logger.Fatal(err.Error())
 		}
-		log.Printf("Configuration %s read successfully\n", configPath)
+		logger.Info(fmt.Sprintf("Configuration %s read successfully", configPath))
 	}
 
-	log.Printf("Server started: %s:%s\n", serverHostname, serverPort)
+	logger.Info(fmt.Sprintf("Server started: %s:%s", serverHostname, serverPort))
 
 	var ctx context.AppContext = context.New(nodeConfig.Sk, serverHostname, serverPort)
 

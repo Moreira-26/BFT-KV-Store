@@ -1,7 +1,7 @@
 package utils
 
 import (
-	"log"
+	"bftkvstore/logger"
 	"net"
 )
 
@@ -9,7 +9,7 @@ import (
 func GetOutboundIP() net.IP {
 	conn, err := net.Dial("udp", "8.8.8.8:80")
 	if err != nil {
-		log.Fatal(err)
+		logger.Fatal(err.Error())
 	}
 	defer conn.Close()
 

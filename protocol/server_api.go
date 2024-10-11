@@ -2,9 +2,9 @@ package protocol
 
 import (
 	"bftkvstore/context"
+	"bftkvstore/logger"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net"
 )
 
@@ -23,19 +23,19 @@ func connectMsg(ctx *context.AppContext, conn net.Conn, body []byte) {
 	err := json.Unmarshal(body, &data)
 
 	if err != nil {
-		log.Println("Error parsing connect message", err)
+		logger.Error("Error parsing connect message", err.Error())
 		sendString(conn, BadArgumentsError())
 		return
 	}
 
-	log.Println("Received CONN message with arguments", data)
+	logger.Info("Received CONN message with arguments", fmt.Sprint(data))
 
 	if data.Address == "" || data.Port == "" {
 		sendString(conn, BadArgumentsError())
 		return
 	}
 
-	log.Printf("Trying to connect to %s:%s\n", data.Address, data.Port)
+	logger.Info(fmt.Sprintf("Trying to connect to %s:%s", data.Address, data.Port))
 
 	connected := ConnectTo(ctx.Address, ctx.Port, data.Address, data.Port)
 
@@ -46,7 +46,7 @@ func connectMsg(ctx *context.AppContext, conn net.Conn, body []byte) {
 	} else {
 		response = fmt.Sprintf("Failed to connect to %s:%s", data.Address, data.Port)
 	}
-	log.Print(response)
+	logger.Debug(response)
 	sendString(conn, response)
 }
 
@@ -60,12 +60,12 @@ func qConnectMsg(ctx *context.AppContext, conn net.Conn, body []byte) {
 
 	err := json.Unmarshal(body, &data)
 	if err != nil {
-		log.Println("Error parsing connect message", err)
+		logger.Error("parsing connect message", err.Error())
 		NewMessage(NO).Send(conn)
 		return
 	}
 
-	log.Printf("Received request to connect from %s:%s\n", data.Address, data.Port)
+	logger.Info(fmt.Sprintf("Received request to connect from %s:%s", data.Address, data.Port))
 	ctx.AddNewNode(data.Address, data.Port)
 
 	NewMessage(OK).Send(conn)

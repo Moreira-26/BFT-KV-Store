@@ -1,13 +1,13 @@
 package config
 
 import (
+	"bftkvstore/logger"
 	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"log"
 	"os"
 )
 
@@ -63,8 +63,7 @@ func WriteConfig(folder string) (config ConfigData) {
 	_, secretkey, err := ed25519.GenerateKey(rand.Reader)
 	// generate key
 	if err != nil {
-		log.Printf("Cannot generate private and public keys\n")
-		os.Exit(1)
+		logger.Fatal(fmt.Sprintf("Failed to generate private and public keys"))
 	}
 
 	// dump private key to file
@@ -76,13 +75,11 @@ func WriteConfig(folder string) (config ConfigData) {
 	}
 	secretPem, err := os.Create(folder + "/private.pem")
 	if err != nil {
-		log.Printf("error when create private.pem: %s \n", err)
-		os.Exit(1)
+		logger.Fatal(fmt.Sprintf("Failed to create private.pem file: %s", err))
 	}
 	err = pem.Encode(secretPem, secretKeyBlock)
 	if err != nil {
-		log.Printf("error when encode private pem: %s \n", err)
-		os.Exit(1)
+		logger.Fatal(fmt.Sprintf("Failed to encode private.pem: %s", err))
 	}
 
 	return ConfigData{

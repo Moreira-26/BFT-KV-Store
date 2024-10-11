@@ -1,8 +1,8 @@
 package protocol
 
 import (
+	"bftkvstore/logger"
 	"encoding/json"
-	"log"
 	"net"
 )
 
@@ -45,7 +45,7 @@ func NewMessage(header MessageHeader) Message {
 
 func MessageFromPayload(payload []byte) (msg Message, ok bool) {
 	if len(payload) < 4 {
-		log.Println("Failed to parse payload into message due to the payload being too short")
+		logger.Alert("Failed to parse payload into message due to the payload being too short")
 		return msg, false
 	}
 
@@ -62,7 +62,7 @@ func (msg Message) AddContent(content interface{}) (Message, error) {
 	// serialize
 	serialized, err := json.Marshal(content)
 	if err != nil {
-		log.Println("Failed to serialize content")
+		logger.Error("Failed to serialize content")
 		return msg, err
 	}
 

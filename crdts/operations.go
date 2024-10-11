@@ -1,12 +1,13 @@
 package crdts
 
 import (
+	"bftkvstore/logger"
 	"crypto/ed25519"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"log"
+	"fmt"
 )
 
 type Operation struct {
@@ -79,7 +80,7 @@ func CalculateOperations(signedops []SignedOperation, crdtType CRDT_TYPE) OpCalc
 		readOp, err := ReadOperation(signedop)
 
 		if readOp.Type != crdtType {
-			log.Println("Found operation of wrong type when calculating:", readOp.Type, "!=", crdtType, readOp)
+			logger.Alert("Found operation of wrong type when calculating:", string(readOp.Type), "!=", string(crdtType), fmt.Sprint(readOp))
 			continue
 		}
 
@@ -102,7 +103,7 @@ func CalculateOperations(signedops []SignedOperation, crdtType CRDT_TYPE) OpCalc
 				_, exists := validOperations[pred]
 
 				if !exists {
-					log.Println("Invalid predecessor, deleting", key)
+					logger.Alert("Invalid predecessor, deleting", key)
 					if iteration == 1 {
 						predecessorsMissing = append(predecessorsMissing, pred)
 					}

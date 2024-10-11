@@ -1,7 +1,8 @@
 package protocol
 
 import (
-	"log"
+	"bftkvstore/logger"
+	"fmt"
 	"net"
 )
 
@@ -9,7 +10,7 @@ func ConnectTo(ownAddress string, ownPort string, targetAddress string, targetPo
 	conn, err := net.Dial("tcp", targetAddress+":"+targetPort)
 
 	if err != nil {
-		log.Printf("Failed to Dial %s:%s\n", targetAddress, targetPort)
+		logger.Alert(fmt.Sprintf("Failed to Dial %s:%s", targetAddress, targetPort))
 		return false
 	}
 
@@ -24,7 +25,7 @@ func ConnectTo(ownAddress string, ownPort string, targetAddress string, targetPo
 	res, err := msg.SendAwaitRead(conn)
 
 	if err != nil {
-		log.Printf("Failed to send Connect request to %s:%s\n", targetAddress, targetPort)
+		logger.Alert(fmt.Sprintf("Failed to send Connect request to %s:%s", targetAddress, targetPort))
 		return false
 	}
 

@@ -2,8 +2,8 @@ package protocol
 
 import (
 	"bftkvstore/context"
+	"bftkvstore/logger"
 	"bufio"
-	"log"
 	"net"
 )
 
@@ -46,7 +46,7 @@ func handleConnection(ctx *context.AppContext, conn net.Conn) {
 	}
 
 	if conn.Close() != nil {
-		log.Println("Failed to close a connection")
+		logger.Alert("Failed to close a connection")
 	}
 }
 

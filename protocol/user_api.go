@@ -3,9 +3,9 @@ package protocol
 import (
 	"bftkvstore/context"
 	"bftkvstore/crdts"
+	"bftkvstore/logger"
 	"encoding/hex"
 	"encoding/json"
-	"log"
 	"net"
 )
 
@@ -17,7 +17,7 @@ func newMsg(ctx *context.AppContext, conn net.Conn, body []byte) {
 	var data newMsgBody
 	err := json.Unmarshal(body, &data)
 	if err != nil {
-		log.Println("Error parsing new crdt message", err)
+		logger.Error("parsing new crdt message", err.Error())
 		NewMessage(NO).Send(conn)
 		return
 	}
@@ -26,14 +26,14 @@ func newMsg(ctx *context.AppContext, conn net.Conn, body []byte) {
 
 	op, opId, err := crdts.NewCRDT(crdtType, ctx.Secretkey)
 	if err != nil {
-		log.Println("Failed to create new", crdtType, "operation", err)
+		logger.Error("Failed to create new", string(crdtType), "operation", err.Error())
 		NewMessage(NO).Send(conn)
 		return
 	}
 
 	assignErr := ctx.Storage.Assign(hex.EncodeToString(opId), op)
 	if assignErr != nil {
-		log.Println("Failed to store new", crdtType, "operation", err)
+		logger.Error("Failed to store new", string(crdtType), "operation", err.Error())
 		NewMessage(NO).Send(conn)
 		return
 	}
@@ -42,7 +42,7 @@ func newMsg(ctx *context.AppContext, conn net.Conn, body []byte) {
 		Key string `json:"key"`
 	}{Key: hex.EncodeToString(opId[:])})
 	if err != nil {
-		log.Println(err)
+		logger.Error(err.Error())
 	} else {
 		msg.Send(conn)
 	}
@@ -56,14 +56,14 @@ func readMsg(ctx *context.AppContext, conn net.Conn, body []byte) {
 	var data readMsgBody
 	err := json.Unmarshal(body, &data)
 	if err != nil {
-		log.Println("Error parsing read message", err)
+		logger.Error("parsing new crdt message", err.Error())
 		NewMessage(NO).Send(conn)
 		return
 	}
 
 	resultObject, err := ctx.Storage.Get(data.Key)
 	if err != nil {
-		log.Println("Error getting item from key:", err)
+		logger.Error("Error getting item from key:", err.Error())
 		NewMessage(NO).Send(conn)
 		return
 	}
@@ -74,7 +74,7 @@ func readMsg(ctx *context.AppContext, conn net.Conn, body []byte) {
 		Type  crdts.CRDT_TYPE `json:"type"`
 	}{Key: data.Key, Value: resultObject.Value, Type: resultObject.Type})
 	if err != nil {
-		log.Println(err)
+		logger.Error(err.Error())
 	} else {
 		msg.Send(conn)
 	}
@@ -82,7 +82,7 @@ func readMsg(ctx *context.AppContext, conn net.Conn, body []byte) {
 
 func storeOperation(ctx *context.AppContext, conn net.Conn, key string, op []byte) bool {
 	if err := ctx.Storage.Append(key, op); err != nil {
-		log.Println("Failed to create operation on key", key, "due to:", err)
+		logger.Error("Failed to create operation on key", key, "due to:", err.Error())
 		return false
 	} else {
 		return true
@@ -98,14 +98,14 @@ func incMsg(ctx *context.AppContext, conn net.Conn, body []byte) {
 	var data readMsgBody
 	err := json.Unmarshal(body, &data)
 	if err != nil {
-		log.Println("Error parsing read message", err)
+		logger.Error("Error parsing read message", err.Error())
 		NewMessage(NO).Send(conn)
 		return
 	}
 
 	resultObject, err := ctx.Storage.Get(data.Key)
 	if err != nil {
-		log.Println("Error getting item from key", err)
+		logger.Error("Error getting item from key", err.Error())
 		NewMessage(NO).Send(conn)
 		return
 	}
@@ -136,14 +136,14 @@ func decMsg(ctx *context.AppContext, conn net.Conn, body []byte) {
 	var data readMsgBody
 	err := json.Unmarshal(body, &data)
 	if err != nil {
-		log.Println("Error parsing read message", err)
+		logger.Error("parsing read message", err.Error())
 		NewMessage(NO).Send(conn)
 		return
 	}
 
 	resultObject, err := ctx.Storage.Get(data.Key)
 	if err != nil {
-		log.Println("Error getting item from key", err)
+		logger.Error("getting item from key", err.Error())
 		NewMessage(NO).Send(conn)
 		return
 	}
@@ -174,14 +174,14 @@ func addMsg(ctx *context.AppContext, conn net.Conn, body []byte) {
 	var data readMsgBody
 	err := json.Unmarshal(body, &data)
 	if err != nil {
-		log.Println("Error parsing read message", err)
+		logger.Error("parsing read message", err.Error())
 		NewMessage(NO).Send(conn)
 		return
 	}
 
 	resultObject, err := ctx.Storage.Get(data.Key)
 	if err != nil {
-		log.Println("Error getting item from key", err)
+		logger.Error("getting item from key", err.Error())
 		NewMessage(NO).Send(conn)
 		return
 	}
