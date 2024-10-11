@@ -14,7 +14,7 @@ type Storage struct {
 
 type StorageCell struct {
 	operations []crdts.SignedOperation
-	crdtType   string
+	crdtType   crdts.CRDT_TYPE
 }
 
 func Init() Storage {
@@ -50,7 +50,7 @@ func (st *Storage) Get(key string) (val crdts.OpCalcResult, err error) {
 	cell, exists := st.data[key]
 
 	if !exists {
-		return val, errors.New(fmt.Sprint("Storage cell with key", key, "does not exist"))
+		return val, errors.New(fmt.Sprint("Storage cell with key ", key, " does not exist"))
 	}
 
 	return crdts.CalculateOperations(cell.operations, cell.crdtType), nil

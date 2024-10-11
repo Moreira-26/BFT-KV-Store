@@ -47,7 +47,7 @@ func TestCounterOperations(t *testing.T) {
 		_, keys[name], _ = ed25519.GenerateKey(rand.Reader)
 	}
 
-	op0, _, err := NewCounterOp(keys["john"], 0)
+	op0, _, err := NewCounterOp(keys["john"])
 	op1, err := IncCounterOp(keys["alice"], 4, []SignedOperation{op0})
 	op2, err := DecCounterOp(keys["john"], 3, []SignedOperation{op0})
 	op3, err := IncCounterOp(keys["alice"], 5, []SignedOperation{op1, op2})

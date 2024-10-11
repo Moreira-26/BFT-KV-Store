@@ -11,7 +11,7 @@ import (
 
 func newMsg(ctx *context.AppContext, conn net.Conn, body []byte) {
 	type newMsgBody struct {
-		Type string `json:"type"`
+		Type crdts.CRDT_TYPE `json:"type"`
 	}
 
 	var data newMsgBody
@@ -22,29 +22,29 @@ func newMsg(ctx *context.AppContext, conn net.Conn, body []byte) {
 		return
 	}
 
-	if data.Type == crdts.CRDT_COUNTER {
-		op, opId, err := crdts.NewCounterOp(ctx.Secretkey, 0)
-		if err != nil {
-			log.Println("Failed to create new counter operation", err)
-			NewMessage(NO).Send(conn)
-			return
-		}
+	crdtType := data.Type
 
-		assignErr := ctx.Storage.Assign(hex.EncodeToString(opId), op)
-		if assignErr != nil {
-			log.Println("Failed to store new counter operation", err)
-			NewMessage(NO).Send(conn)
-			return
-		}
+	op, opId, err := crdts.NewCRDT(crdtType, ctx.Secretkey)
+	if err != nil {
+		log.Println("Failed to create new", crdtType, "operation", err)
+		NewMessage(NO).Send(conn)
+		return
+	}
 
-		msg, err := NewMessage(OK).AddContent(struct {
-			Key string `json:"key"`
-		}{Key: hex.EncodeToString(opId[:])})
-		if err != nil {
-			log.Println(err)
-		} else {
-			msg.Send(conn)
-		}
+	assignErr := ctx.Storage.Assign(hex.EncodeToString(opId), op)
+	if assignErr != nil {
+		log.Println("Failed to store new", crdtType, "operation", err)
+		NewMessage(NO).Send(conn)
+		return
+	}
+
+	msg, err := NewMessage(OK).AddContent(struct {
+		Key string `json:"key"`
+	}{Key: hex.EncodeToString(opId[:])})
+	if err != nil {
+		log.Println(err)
+	} else {
+		msg.Send(conn)
 	}
 }
 
@@ -63,16 +63,16 @@ func readMsg(ctx *context.AppContext, conn net.Conn, body []byte) {
 
 	resultObject, err := ctx.Storage.Get(data.Key)
 	if err != nil {
-		log.Println("Error getting item from key", err)
+		log.Println("Error getting item from key:", err)
 		NewMessage(NO).Send(conn)
 		return
 	}
 
 	msg, err := NewMessage(OK).AddContent(struct {
-		Key   string      `json:"key"`
-		Value interface{} `json:"value"`
-		Type  string      `json:"type"`
-	}{Key: data.Key, Value: resultObject.Value, Type: "counter"})
+		Key   string          `json:"key"`
+		Value interface{}     `json:"value"`
+		Type  crdts.CRDT_TYPE `json:"type"`
+	}{Key: data.Key, Value: resultObject.Value, Type: resultObject.Type})
 	if err != nil {
 		log.Println(err)
 	} else {

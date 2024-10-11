@@ -13,7 +13,8 @@ type Operation struct {
 	Op    string
 	Preds []string
 	Crdt  interface{}
-	Type  string
+	Type  CRDT_TYPE
+	Nonce string
 }
 
 type SignedOperation []byte
@@ -67,11 +68,11 @@ type OpCalcResult struct {
 	Heads        []SignedOperation
 	Value        interface{}
 	PredsMissing []string
-	Type         string
+	Type         CRDT_TYPE
 }
 
 // TODO: Check if the new operation exists
-func CalculateOperations(signedops []SignedOperation, crdtType string) OpCalcResult {
+func CalculateOperations(signedops []SignedOperation, crdtType CRDT_TYPE) OpCalcResult {
 	validOperations := make(map[string]Operation)
 	signedOperations := make(map[string]SignedOperation)
 	for _, signedop := range signedops {
@@ -141,7 +142,7 @@ func CalculateOperations(signedops []SignedOperation, crdtType string) OpCalcRes
 		switch crdtType {
 		case CRDT_COUNTER:
 			{
-				if v.value.Op == "new" || v.value.Op == "inc" {
+				if v.value.Op == "inc" {
 					value += v.value.Crdt.(map[string]interface{})["value"].(float64)
 				} else if v.value.Op == "dec" {
 					value -= v.value.Crdt.(map[string]interface{})["value"].(float64)
