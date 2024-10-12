@@ -3,6 +3,7 @@ package protocol
 import (
 	"bftkvstore/logger"
 	"encoding/json"
+	"errors"
 	"net"
 )
 
@@ -33,20 +34,23 @@ const (
 var EMPTYBODY struct{} = struct{}{}
 
 type Message struct {
-	Header  MessageHeader
-	Content []byte
+	header    MessageHeader
+	content   []byte
+	malformed error
 }
 
 func NewMessage(header MessageHeader) Message {
 	return Message{
 		header,
 		make([]byte, 0),
+		nil,
 	}
 }
 
 func MessageFromPayload(payload []byte) (msg Message, ok bool) {
 	if len(payload) < 4 {
-		logger.Alert("Failed to parse payload into message due to the payload being too short")
+		msg.malformed = errors.New("Failed to parse payload into message due to the payload being too short")
+		logger.Alert(msg.malformed)
 		return msg, false
 	}
 
@@ -54,28 +58,34 @@ func MessageFromPayload(payload []byte) (msg Message, ok bool) {
 	var content = payload[4:]
 
 	return Message{
-		Header:  header,
-		Content: content,
+		header:    header,
+		content:   content,
+		malformed: nil,
 	}, true
 }
 
-func (msg Message) AddContent(content interface{}) (Message, error) {
-	// serialize
-	serialized, err := json.Marshal(content)
-	if err != nil {
-		logger.Error("Failed to serialize content")
-		return msg, err
+func (msg Message) AddContent(content interface{}) Message {
+	if serialized, err := json.Marshal(content); err != nil {
+		msg.malformed = errors.New("Failed to serialize content")
+	} else {
+		msg.content = serialized
 	}
 
-	msg.Content = serialized
+	return msg
+}
 
-	return msg, nil
+func (msg Message) IsMalformed() bool {
+	return msg.malformed != nil
 }
 
 func (msg Message) Send(conn net.Conn) (e error) {
-	var payload []byte = []byte(msg.Header)
+	if msg.IsMalformed() {
+		return msg.malformed
+	}
 
-	payload = append(payload, msg.Content...)
+	var payload []byte = []byte(msg.header)
+
+	payload = append(payload, msg.content...)
 
 	_, e = conn.Write(payload)
 
@@ -83,9 +93,7 @@ func (msg Message) Send(conn net.Conn) (e error) {
 }
 
 func (msg Message) SendAwaitRead(conn net.Conn) (data []byte, e error) {
-	e = msg.Send(conn)
-
-	if e != nil {
+	if e := msg.Send(conn); e != nil {
 		return nil, e
 	}
 

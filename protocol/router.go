@@ -6,22 +6,22 @@ import (
 )
 
 func Router(ctx *context.AppContext, conn net.Conn, msg Message) {
-	switch msg.Header {
+	switch msg.header {
 	// server api
 	case PING:
 		pingMsg(conn)
 	case CONNECT:
-		connectMsg(ctx, conn, msg.Content)
+		connectMsg(ctx, conn, msg.content)
 	case Q_CONNECT:
-		qConnectMsg(ctx, conn, msg.Content)
+		qConnectMsg(ctx, conn, msg.content)
 
 	// user api
 	case API_NEW:
-		newMsg(ctx, conn, msg.Content)
+		newMsg(ctx, conn, msg.content)
 	case API_GET:
-		readMsg(ctx, conn, msg.Content)
+		readMsg(ctx, conn, msg.content)
 	case API_INC, API_DEC, API_ADD, API_RMV:
-		opMsg(msg.Header, ctx, conn, msg.Content)
+		opMsg(msg.header, ctx, conn, msg.content)
 	default:
 	}
 }

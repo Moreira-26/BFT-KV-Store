@@ -14,16 +14,10 @@ func ConnectTo(ownAddress string, ownPort string, targetAddress string, targetPo
 		return false
 	}
 
-	msg, err := NewMessage(Q_CONNECT).AddContent(struct {
+	res, err := NewMessage(Q_CONNECT).AddContent(struct {
 		Address string `json:"address"`
 		Port    string `json:"port"`
-	}{ownAddress, ownPort})
-	if err != nil {
-		return false
-	}
-
-	res, err := msg.SendAwaitRead(conn)
-
+	}{ownAddress, ownPort}).SendAwaitRead(conn)
 	if err != nil {
 		logger.Alert(fmt.Sprintf("Failed to send Connect request to %s:%s", targetAddress, targetPort))
 		return false
@@ -31,5 +25,5 @@ func ConnectTo(ownAddress string, ownPort string, targetAddress string, targetPo
 
 	msg_parsed, ok := MessageFromPayload(res)
 
-	return ok && msg_parsed.Header == OK
+	return ok && msg_parsed.header == OK
 }

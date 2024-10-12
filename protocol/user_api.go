@@ -40,13 +40,11 @@ func newMsg(ctx *context.AppContext, conn net.Conn, body []byte) {
 		return
 	}
 
-	msg, err := NewMessage(OK).AddContent(struct {
+	err = NewMessage(OK).AddContent(struct {
 		Key string `json:"key"`
-	}{Key: hex.EncodeToString(opId[:])})
+	}{Key: hex.EncodeToString(opId[:])}).Send(conn)
 	if err != nil {
 		logger.Error(err)
-	} else {
-		msg.Send(conn)
 	}
 }
 
@@ -67,15 +65,17 @@ func readMsg(ctx *context.AppContext, conn net.Conn, body []byte) {
 		return
 	}
 
-	msg, err := NewMessage(OK).AddContent(struct {
+	err = NewMessage(OK).AddContent(struct {
 		Key   string          `json:"key"`
 		Value interface{}     `json:"value"`
 		Type  crdts.CRDT_TYPE `json:"type"`
-	}{Key: data.Key, Value: resultObject.Value, Type: resultObject.Type})
+	}{
+		Key:   data.Key,
+		Value: resultObject.Value,
+		Type:  resultObject.Type,
+	}).Send(conn)
 	if err != nil {
 		logger.Error(err)
-	} else {
-		msg.Send(conn)
 	}
 }
 
