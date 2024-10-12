@@ -32,8 +32,11 @@ func withColor(color string, word string) string {
 
 func print(prefix string, args ...any) {
 	text := make([]byte, 0)
-	for _, v := range args {
+	for i, v := range args {
 		text = fmt.Append(text, fmt.Sprint(v))
+		if i != len(args) {
+			text = fmt.Append(text, " ")
+		}
 	}
 	log.Println(prefix, string(text))
 }
