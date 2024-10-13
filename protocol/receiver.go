@@ -11,7 +11,7 @@ const READER_SIZE = 1000
 func ReadFromConnection(conn net.Conn) (msg []byte, err error) {
 	reader := bufio.NewReader(conn)
 
-	data := make([]byte, 1000)
+	data := make([]byte, READER_SIZE)
 
 	for {
 		sz, err := reader.Read(data)

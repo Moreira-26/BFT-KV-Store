@@ -29,13 +29,14 @@ func connectMsg(ctx *context.AppContext, conn net.Conn, body []byte) {
 		return
 	}
 
-	logger.Info(fmt.Sprintf("Trying to connect to %s:%s", data.Address, data.Port))
 	serverConn, connected := ConnectTo(ctx.Address, ctx.Port, data.Address, data.Port)
 
 	if connected {
+		logger.Info(fmt.Sprintf("Connected to %s:%s", data.Address, data.Port))
 		NewMessage(OK).Send(conn)
 		ctx.AddNewNode(data.Address, data.Port, serverConn)
 	} else {
+		logger.Alert(fmt.Sprintf("Failed to connect to %s:%s", data.Address, data.Port))
 		NewMessage(NO).Send(conn)
 	}
 }

@@ -7,8 +7,11 @@ import (
 	"bftkvstore/set"
 	"bftkvstore/utils"
 	"encoding/hex"
+	"errors"
 	"fmt"
+	"io"
 	"net"
+	"syscall"
 )
 
 type connectionVariables struct {
@@ -19,12 +22,47 @@ type connectionVariables struct {
 }
 
 type connectionData struct {
-	conn net.Conn
-	vars *connectionVariables
+	conn   net.Conn
+	vars   *connectionVariables
+	ch     chan []byte
+	hangup chan bool
 }
 
 var connections map[string]*connectionData = make(map[string]*connectionData)
 var M set.Set[string] = set.New[string]()
+
+func isNetConnClosedErr(err error) bool {
+	switch {
+	case
+		errors.Is(err, net.ErrClosed),
+		errors.Is(err, io.EOF),
+		errors.Is(err, syscall.EPIPE):
+		return true
+	default:
+		return false
+	}
+}
+
+// FIXME: What if the connection ends?
+func listenToConnection(connData *connectionData) {
+	for {
+		msg, err := ReadFromConnection(connData.conn)
+
+		if err != nil {
+			if isNetConnClosedErr(err) {
+				logger.Alert("Connection Closed")
+				connData.hangup <- true
+				return
+			} else {
+				logger.Error("Error in listen", err)
+				connData.hangup <- true
+				return
+			}
+		}
+
+		connData.ch <- msg
+	}
+}
 
 func BroadcastReceiver(ctx *context.AppContext) {
 	for {
@@ -34,28 +72,41 @@ func BroadcastReceiver(ctx *context.AppContext) {
 				node := ctx.NewNodes[0]
 
 				name := fmt.Sprintf("%s:%s", node.Address, node.Port)
-				connections[name] = &connectionData{
-					conn: node.Conn,
-					vars: nil,
+
+				val, exists := connections[name]
+
+				if exists {
+					val.conn = node.Conn
+					val.ch = make(chan []byte)
+					val.hangup = make(chan bool)
+					connections[name] = val
+				} else {
+					connections[name] = &connectionData{
+						conn:   node.Conn,
+						vars:   nil,
+						ch:     make(chan []byte),
+						hangup: make(chan bool),
+					}
 				}
-				on_connection_to_another_replica(ctx, connections[name])
+				go listenToConnection(connections[name])
+
+				if !exists {
+					on_connection_to_another_replica(ctx, connections[name])
+				}
+
 				ctx.NewNodes = ctx.NewNodes[1:]
 			}
 			ctx.Lock.Unlock()
 		}
 		for name, connData := range connections {
-			if connData.conn == nil {
-				// TODO: remove from connections
-				continue
-			}
-			if payload, err := ReadFromConnection(connData.conn); err != nil {
-				continue
-			} else {
+			select {
+			case payload := <-connData.ch:
 				if len(payload) < 4 {
 					continue
 				}
 
 				header := MessageHeader(payload[:4])
+
 				logger.Debug("from main:", header, "from:", name)
 
 				switch header {
@@ -64,6 +115,11 @@ func BroadcastReceiver(ctx *context.AppContext) {
 				case NEEDS:
 					on_receiving_needs(ctx, connData, payload[4:])
 				}
+			case <-connData.hangup:
+				delete(connections, name)
+				continue
+			default:
+				continue
 			}
 		}
 	}
@@ -76,8 +132,6 @@ type msgsDTO struct {
 
 // Algorithm 1 A Byzantine causal broadcast algorithm.
 func broadcast(ctx *context.AppContext, key string, m crdts.SignedOperation) {
-	fmt.Println("Issued broadcast", key)
-
 	// TODO: Add a lock here because it is atomic
 	M = set.Add(M, hex.EncodeToString(m))
 
@@ -94,6 +148,8 @@ func broadcast(ctx *context.AppContext, key string, m crdts.SignedOperation) {
 		if connData.conn != nil {
 			if err := msg.Send(connData.conn); err != nil {
 				logger.Alert("Failed to send Message during broadcast", err)
+			} else {
+				// logger.Debug("Sent MSGS", string(msg.content))
 			}
 		}
 	}
@@ -194,27 +250,13 @@ func handleMissing(ctx *context.AppContext, connData *connectionData, key string
 		set.FromSlice(utils.Map[string, string](connData.vars.recvd, crdts.HashOperationFromString)),
 	)
 
-	fmt.Println("missing", connData.vars.missing)
 	if len(connData.vars.missing) == 0 {
 		// TODO: Add lock here because it is atomic
 		msgs := set.Diff(set.FromSlice(connData.vars.recvd), M)
 
-		fmt.Println("msgs would be", utils.Map(set.Diff(set.FromSlice(connData.vars.recvd), M), func(element string) crdts.Operation {
-			toString, _ := hex.DecodeString(element)
-			op, _ := crdts.ReadOperation(toString)
-			return op
-		}))
-
 		M = set.Union(M, connData.vars.recvd)
 
-		// TODO: deliver all of the messages in msgs in topologically sorted order
 		var orderedMsgs []string = crdts.CalculateOperationsTopologicalOrder(msgs)
-
-		fmt.Println("after sort msgs are", utils.Map(orderedMsgs, func(element string) crdts.Operation {
-			toString, _ := hex.DecodeString(element)
-			op, _ := crdts.ReadOperation(toString)
-			return op
-		}))
 
 		for _, msg := range orderedMsgs {
 			signedOp, _ := hex.DecodeString(msg)
@@ -231,7 +273,6 @@ func handleMissing(ctx *context.AppContext, connData *connectionData, key string
 			}
 		}
 	} else {
-		logger.Debug("Sending needs with", connData.vars.missing)
 		msg := NewMessage(NEEDS).AddContent(
 			msgsDTO{
 				Key:      key,
