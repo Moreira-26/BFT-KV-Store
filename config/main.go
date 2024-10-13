@@ -2,6 +2,8 @@ package config
 
 import (
 	"bftkvstore/logger"
+	"bftkvstore/set"
+	"bftkvstore/utils"
 	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/x509"
@@ -26,15 +28,11 @@ func ReadConfig(path string) (config ConfigData, err error) {
 
 	entries, err := os.ReadDir(path)
 
-	var hasprivatekey bool = false
-
-	// TODO: This for loop is unnecessary
-	for _, entry := range entries {
-		switch entry.Name() {
-		case "private.pem":
-			hasprivatekey = true
-		}
-	}
+	hasprivatekey := set.Has(set.FromSlice[string](
+		utils.Map(entries, func(el os.DirEntry) string {
+			return el.Name()
+		}),
+	), "private.pem")
 
 	if !hasprivatekey {
 		return config, errors.New(fmt.Sprintf("The private.pem file is missing from the configuration.\n"))
