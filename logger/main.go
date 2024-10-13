@@ -62,6 +62,6 @@ func Alert(args ...any) {
 }
 
 func Fatal(args ...any) {
-	print(withColor(_BLACK, "[FATAL]"), args...)
+	print(withColor(_PURPLE, "[FATAL]"), args...)
 	os.Exit(1)
 }
