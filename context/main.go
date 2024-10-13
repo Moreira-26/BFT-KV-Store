@@ -3,6 +3,7 @@ package context
 import (
 	"bftkvstore/storage"
 	"crypto/ed25519"
+	"net"
 	"sync"
 )
 
@@ -14,6 +15,7 @@ type AppContext struct {
 	Nodes     []struct {
 		Address string
 		Port    string
+		Conn    net.Conn
 	}
 	Storage storage.Storage
 }
@@ -26,12 +28,13 @@ func New(secretkey ed25519.PrivateKey, hostname string, port string) AppContext 
 		Nodes: make([]struct {
 			Address string
 			Port    string
+			Conn    net.Conn
 		}, 0),
 		Storage: storage.Init(),
 	}
 }
 
-func (ctx *AppContext) AddNewNode(address string, port string) {
+func (ctx *AppContext) AddNewNode(address string, port string, conn net.Conn) {
 	ctx.lock.Lock()
 	defer ctx.lock.Unlock()
 
@@ -44,5 +47,6 @@ func (ctx *AppContext) AddNewNode(address string, port string) {
 	ctx.Nodes = append(ctx.Nodes, struct {
 		Address string
 		Port    string
-	}{address, port})
+		Conn    net.Conn
+	}{address, port, conn})
 }

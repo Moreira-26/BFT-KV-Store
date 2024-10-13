@@ -14,7 +14,7 @@ type CRDT_TYPE string
 const (
 	CRDT_COUNTER CRDT_TYPE = "counter"
 	CRDT_GSET    CRDT_TYPE = "gset"
-	CRDT_2PSET    CRDT_TYPE = "2pset"
+	CRDT_2PSET   CRDT_TYPE = "2pset"
 )
 
 func isValidCrdtType(crdtType CRDT_TYPE) bool {

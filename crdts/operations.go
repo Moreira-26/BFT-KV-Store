@@ -19,20 +19,34 @@ type Operation struct {
 
 type SignedOperation []byte
 
+func HashOperationFromString(opStr string) string {
+	op, _ := hex.DecodeString(opStr)
+	hash := sha256.Sum256(op)
+	return hex.EncodeToString(hash[:])
+}
+
 func HashOperation(op []byte) string {
 	hash := sha256.Sum256(op)
 	return hex.EncodeToString(hash[:])
 }
 
-func ReadOperation(payload []byte) (op Operation, err error) {
+func IsValid(payload []byte) bool {
+	if len(payload) < 96 {
+		return false
+	}
 	publickey := payload[:32]
 	signature := payload[32:96]
 	content := payload[96:]
 
-	if !ed25519.Verify(publickey, content, signature) {
-		return op, errors.New("Operation cannot be verified")
+	return ed25519.Verify(publickey, content, signature)
+}
+
+func ReadOperation(payload []byte) (op Operation, err error) {
+	if !IsValid(payload) {
+		return op, errors.New("The operation provided is not valid")
 	}
 
+	content := payload[96:]
 	err = json.Unmarshal(content, &op)
 	if err != nil {
 		return op, err

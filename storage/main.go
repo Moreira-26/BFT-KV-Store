@@ -15,6 +15,8 @@ type Storage struct {
 type StorageCell struct {
 	operations []crdts.SignedOperation
 	crdtType   crdts.CRDT_TYPE
+	heads      []crdts.SignedOperation
+	value      interface{}
 }
 
 func Init() Storage {
@@ -37,13 +39,25 @@ func (st *Storage) Assign(key string, value crdts.SignedOperation) error {
 		return errors.New("Failed to parse the given operation bytes")
 	}
 
-	newCell := StorageCell{operations: make([]crdts.SignedOperation, 1), crdtType: valueOpParsed.Type}
+	newCell := StorageCell{operations: make([]crdts.SignedOperation, 1), crdtType: valueOpParsed.Type, heads: make([]crdts.SignedOperation, 1)}
 	newCell.operations[0] = value
+	newCell.heads[0] = value
+
+	newCell.update()
+
 	st.data[key] = newCell
+
+
 	return nil
 }
 
-func (st *Storage) Get(key string) (val crdts.OpCalcResult, err error) {
+type GetResultDTO struct {
+	Value interface{}
+	Heads []crdts.SignedOperation
+	Type  crdts.CRDT_TYPE
+}
+
+func (st *Storage) Get(key string) (val GetResultDTO, err error) {
 	st.lock.RLock()
 	defer st.lock.RUnlock()
 
@@ -53,7 +67,7 @@ func (st *Storage) Get(key string) (val crdts.OpCalcResult, err error) {
 		return val, errors.New(fmt.Sprint("Storage cell with key ", key, " does not exist"))
 	}
 
-	return crdts.CalculateOperations(cell.operations, cell.crdtType), nil
+	return GetResultDTO{Value: cell.value, Type: cell.crdtType, Heads: cell.heads}, nil
 }
 
 func (st *Storage) Append(key string, newOp crdts.SignedOperation) error {
@@ -74,7 +88,29 @@ func (st *Storage) Append(key string, newOp crdts.SignedOperation) error {
 		return errors.New("The given operation is not of the same type as the key storing")
 	}
 
+	for _, pred := range valueOpParsed.Preds {
+		found := false
+		for _, op := range cell.operations {
+			if pred == crdts.HashOperation(op) {
+				found = true
+			}
+		}
+		if !found {
+			return errors.New("Attempted to append operation with unknown predecessors")
+		}
+	}
+
 	cell.operations = append(cell.operations, newOp)
+	cell.update()
+
 	st.data[key] = cell
+
 	return nil
+}
+
+func (c *StorageCell) update() {
+	result := crdts.CalculateOperations(c.operations, c.crdtType)
+
+	c.heads = result.Heads
+	c.value = result.Value
 }

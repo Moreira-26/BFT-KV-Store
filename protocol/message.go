@@ -7,10 +7,6 @@ import (
 	"net"
 )
 
-func sendString(conn net.Conn, msg string) (n int, e error) {
-	return conn.Write([]byte(msg))
-}
-
 type MessageHeader string
 
 const (
@@ -21,6 +17,9 @@ const (
 	Q_CONNECT MessageHeader = "CON?" // Asks a node if he wants to connect
 	OK        MessageHeader = "R_OK"
 	NO        MessageHeader = "R_NO"
+	ERR		  MessageHeader = "R_ER"
+	MSGS      MessageHeader = "MSGS"
+	NEEDS     MessageHeader = "NEED"
 
 	// user api
 	API_NEW MessageHeader = "/new" // Adds a new key to the database, expects a type

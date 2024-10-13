@@ -3,7 +3,6 @@ package protocol
 import (
 	"bftkvstore/context"
 	"bftkvstore/logger"
-	"encoding/json"
 	"fmt"
 	"net"
 )
@@ -18,55 +17,47 @@ func connectMsg(ctx *context.AppContext, conn net.Conn, body []byte) {
 		Port    string `json:"port"`
 	}
 
-	var data connectMsgBody
-
-	err := json.Unmarshal(body, &data)
-
+	data, err := unmarshallJson[connectMsgBody](body)
 	if err != nil {
 		logger.Error("Error parsing connect message", err.Error())
-		sendString(conn, BadArgumentsError())
+		NewMessage(ERR).Send(conn)
 		return
 	}
 
 	logger.Info("Received CONN message with arguments", data)
 
 	if data.Address == "" || data.Port == "" {
-		sendString(conn, BadArgumentsError())
+		NewMessage(ERR).Send(conn)
 		return
 	}
 
 	logger.Info(fmt.Sprintf("Trying to connect to %s:%s", data.Address, data.Port))
+	serverConn, connected := ConnectTo(ctx.Address, ctx.Port, data.Address, data.Port)
 
-	connected := ConnectTo(ctx.Address, ctx.Port, data.Address, data.Port)
-
-	var response string = ""
 	if connected {
-		response = fmt.Sprintf("Connected to %s:%s successfully", data.Address, data.Port)
-		ctx.AddNewNode(data.Address, data.Port)
+		NewMessage(OK).Send(conn)
+		ctx.AddNewNode(data.Address, data.Port, serverConn)
 	} else {
-		response = fmt.Sprintf("Failed to connect to %s:%s", data.Address, data.Port)
+		NewMessage(NO).Send(conn)
 	}
-	logger.Debug(response)
-	sendString(conn, response)
 }
 
-func qConnectMsg(ctx *context.AppContext, conn net.Conn, body []byte) {
+func qConnectMsg(ctx *context.AppContext, conn net.Conn, body []byte) (ok bool) {
 	type connectMsgBody struct {
 		Address string `json:"address"`
 		Port    string `json:"port"`
 	}
 
-	var data connectMsgBody
-
-	err := json.Unmarshal(body, &data)
+	data, err := unmarshallJson[connectMsgBody](body)
 	if err != nil {
 		logger.Error("parsing connect message", err)
 		NewMessage(NO).Send(conn)
-		return
+		return false
 	}
 
 	logger.Info(fmt.Sprintf("Received request to connect from %s:%s", data.Address, data.Port))
-	ctx.AddNewNode(data.Address, data.Port)
+	ctx.AddNewNode(data.Address, data.Port, conn)
 
 	NewMessage(OK).Send(conn)
+	return true
 }

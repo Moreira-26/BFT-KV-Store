@@ -40,11 +40,15 @@ func newMsg(ctx *context.AppContext, conn net.Conn, body []byte) {
 		return
 	}
 
+	key := hex.EncodeToString(opId[:])
+
 	err = NewMessage(OK).AddContent(struct {
 		Key string `json:"key"`
-	}{Key: hex.EncodeToString(opId[:])}).Send(conn)
+	}{Key: key}).Send(conn)
 	if err != nil {
 		logger.Error(err)
+	} else {
+		broadcast(ctx, key, op)
 	}
 }
 
@@ -101,6 +105,7 @@ func opMsg(opType MessageHeader, ctx *context.AppContext, conn net.Conn, body []
 	op, err := getOperation(opType, resultObject.Type, ctx.Secretkey, data.Value, resultObject.Heads)
 	if err == nil && storeOperation(ctx, conn, data.Key, op) {
 		NewMessage(OK).Send(conn)
+		broadcast(ctx, data.Key, op)
 	} else {
 		logger.Alert(err, data.Value)
 		NewMessage(NO).Send(conn)
@@ -112,13 +117,13 @@ func getOperation(opType MessageHeader, crdtType crdts.CRDT_TYPE, secretkey ed25
 	case crdts.CRDT_COUNTER:
 		switch opType {
 		case API_INC:
-			if v, ok := value.(float64); ok == true {
+			if v, ok := value.(float64); ok == true && int(math.Round(v)) > 0 {
 				return crdts.IncCounterOp(secretkey, int(math.Round(v)), heads)
 			} else {
 				goto wrongValueType
 			}
 		case API_DEC:
-			if v, ok := value.(float64); ok == true {
+			if v, ok := value.(float64); ok == true && int(math.Round(v)) > 0 {
 				return crdts.DecCounterOp(secretkey, int(math.Round(v)), heads)
 			} else {
 				goto wrongValueType

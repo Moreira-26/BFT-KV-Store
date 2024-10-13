@@ -2,10 +2,15 @@ package protocol
 
 import (
 	"bftkvstore/context"
+	"bftkvstore/logger"
 	"net"
 )
 
 func Router(ctx *context.AppContext, conn net.Conn, msg Message) {
+	logger.Debug("Received from TCP ", msg.header, string(msg.content))
+
+	closeConnection := true
+
 	switch msg.header {
 	// server api
 	case PING:
@@ -13,7 +18,9 @@ func Router(ctx *context.AppContext, conn net.Conn, msg Message) {
 	case CONNECT:
 		connectMsg(ctx, conn, msg.content)
 	case Q_CONNECT:
-		qConnectMsg(ctx, conn, msg.content)
+		closeConnection = !qConnectMsg(ctx, conn, msg.content)
+	case MSGS:
+		on_receiving_msgs(ctx, conn, msg.content)
 
 	// user api
 	case API_NEW:
@@ -23,5 +30,11 @@ func Router(ctx *context.AppContext, conn net.Conn, msg Message) {
 	case API_INC, API_DEC, API_ADD, API_RMV:
 		opMsg(msg.header, ctx, conn, msg.content)
 	default:
+	}
+
+	if closeConnection {
+		if err := conn.Close(); err != nil {
+			logger.Alert("Failed to close a connection", err)
+		}
 	}
 }
