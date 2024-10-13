@@ -51,26 +51,5 @@ func main() {
 
 	go protocol.ReceiverStart(&ctx, serverPort)
 
-	for {
-		for _, node := range ctx.Nodes {
-			if node.Conn == nil {
-				continue
-			}
-			if payload, err := protocol.ReadFromConnection(node.Conn); err != nil {
-				continue
-			} else {
-				if len(payload) < 4 {
-					continue
-				}
-
-				header := protocol.MessageHeader(payload[:4])
-				logger.Debug("from main:", header, "from:", node.Address, node.Port)
-
-				switch header {
-				case protocol.MSGS:
-					// TODO: call the right function
-				}
-			}
-		}
-	}
+	protocol.BroadcastReceiver(&ctx)
 }

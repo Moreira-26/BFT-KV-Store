@@ -7,8 +7,6 @@ import (
 )
 
 func Router(ctx *context.AppContext, conn net.Conn, msg Message) {
-	logger.Debug("Received from TCP ", msg.header, string(msg.content))
-
 	closeConnection := true
 
 	switch msg.header {
@@ -19,8 +17,6 @@ func Router(ctx *context.AppContext, conn net.Conn, msg Message) {
 		connectMsg(ctx, conn, msg.content)
 	case Q_CONNECT:
 		closeConnection = !qConnectMsg(ctx, conn, msg.content)
-	case MSGS:
-		on_receiving_msgs(ctx, conn, msg.content)
 
 	// user api
 	case API_NEW:

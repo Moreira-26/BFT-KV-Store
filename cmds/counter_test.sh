@@ -3,7 +3,7 @@
 RES=`./sendmsg.sh "/new {\"type\": \"counter\"}"`
 KEY=`echo ${RES[@]:4} | jq -r ".key"`
 
-echo "New GSet created with id: ${KEY}"
+echo "New Counter created with id: ${KEY}"
 echo
 
 for var in "$@"
@@ -16,7 +16,6 @@ do
 done
 
 echo 
-echo "Getting value of ${KEY}"
 VALUE_GET=`./sendmsg.sh "/get {\"key\": \"${KEY}\"}"`
 VALUE_READ=`echo ${VALUE_GET[@]:4} | jq`
 

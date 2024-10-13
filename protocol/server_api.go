@@ -24,8 +24,6 @@ func connectMsg(ctx *context.AppContext, conn net.Conn, body []byte) {
 		return
 	}
 
-	logger.Info("Received CONN message with arguments", data)
-
 	if data.Address == "" || data.Port == "" {
 		NewMessage(ERR).Send(conn)
 		return

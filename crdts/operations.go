@@ -2,6 +2,8 @@ package crdts
 
 import (
 	"bftkvstore/logger"
+	"bftkvstore/set"
+	"bftkvstore/utils"
 	"crypto/ed25519"
 	"crypto/sha256"
 	"encoding/hex"
@@ -87,8 +89,9 @@ type OpCalcResult struct {
 
 // TODO: Check if the new operation exists
 func CalculateOperations(signedops []SignedOperation, crdtType CRDT_TYPE) OpCalcResult {
-	validOperations := make(map[string]Operation)
-	signedOperations := make(map[string]SignedOperation)
+	validOperationsMap := make(map[string]Operation)
+	signedOperationsMap := make(map[string]SignedOperation)
+
 	for _, signedop := range signedops {
 		readOp, err := ReadOperation(signedop)
 
@@ -98,11 +101,10 @@ func CalculateOperations(signedops []SignedOperation, crdtType CRDT_TYPE) OpCalc
 		}
 
 		if err == nil {
-			validOperations[HashOperation(signedop)] = readOp
-			signedOperations[HashOperation(signedop)] = signedop
+			validOperationsMap[HashOperation(signedop)] = readOp
+			signedOperationsMap[HashOperation(signedop)] = signedop
 		}
 	}
-
 	predecessorsMissing := make([]string, 0)
 
 	// This loop removes every operation that has an invalid op as predecessor
@@ -111,9 +113,9 @@ func CalculateOperations(signedops []SignedOperation, crdtType CRDT_TYPE) OpCalc
 		iteration += 1
 		keysToDelete := make(map[string]bool)
 
-		for key, validOpVal := range validOperations {
+		for key, validOpVal := range validOperationsMap {
 			for _, pred := range validOpVal.Preds {
-				_, exists := validOperations[pred]
+				_, exists := validOperationsMap[pred]
 
 				if !exists {
 					logger.Alert("Invalid predecessor, deleting", key)
@@ -129,18 +131,18 @@ func CalculateOperations(signedops []SignedOperation, crdtType CRDT_TYPE) OpCalc
 			break
 		} else {
 			for key, _ := range keysToDelete {
-				delete(validOperations, key)
+				delete(validOperationsMap, key)
 			}
 		}
 	}
 
 	hashGraph := make(map[string]graphNode)
 
-	for key, _ := range validOperations {
+	for key, _ := range validOperationsMap {
 		_, exists := hashGraph[key]
 
 		if !exists {
-			propagateNode(hashGraph, validOperations, key, 0)
+			propagateNode(hashGraph, validOperationsMap, key, 0)
 		}
 	}
 
@@ -159,7 +161,7 @@ func CalculateOperations(signedops []SignedOperation, crdtType CRDT_TYPE) OpCalc
 
 	for k, v := range hashGraph {
 		if v.tier == 0 {
-			heads = append(heads, signedOperations[k])
+			heads = append(heads, signedOperationsMap[k])
 		}
 
 		reducer.add(v)
@@ -257,4 +259,105 @@ func (r *twoPhaseSetReducer) value() any {
 		}
 	}
 	return keys
+}
+
+func CalculateOperationsTopologicalOrder(ops []string) []string {
+	opStringMap := make(map[string]string)
+	signedops := utils.Map(ops, func(elem string) []byte {
+		r, _ := hex.DecodeString(elem)
+		opStringMap[HashOperation(r)] = elem
+		return r
+	})
+	validOperationsMap := make(map[string]Operation)
+
+	for _, signedop := range signedops {
+		readOp, err := ReadOperation(signedop)
+
+		if err == nil {
+			validOperationsMap[HashOperation(signedop)] = readOp
+		}
+	}
+
+	hashGraph := make(map[string]graphNode)
+	keys := set.New[string]()
+
+	for key, op := range validOperationsMap {
+		keys = set.Add(keys, key)
+		hashGraph[key] = graphNode{
+			value: op,
+			succs: set.New[string](),
+			preds: set.New[string](),
+			tier:  0,
+		}
+	}
+
+	for key, op := range validOperationsMap {
+		for _, pred := range op.Preds {
+			if !set.Has(keys, pred) {
+				continue
+			}
+			// add key to succs to pred node
+			predN := hashGraph[pred]
+			predN.succs = set.Add(predN.succs, key)
+			hashGraph[pred] = predN
+
+			// add key to succs to pred node
+			succN := hashGraph[key]
+			succN.preds = set.Add(succN.preds, pred)
+			hashGraph[key] = succN
+		}
+
+	}
+
+	res := utils.Map(opTopologicalSort(hashGraph), func(elem string) string {
+		return opStringMap[elem]
+	})
+
+	if len(res) != len(keys) {
+		logger.Fatal("Something bad happened during topological sort!", len(res), len(keys), len(hashGraph))
+	}
+
+	return res
+}
+
+func opTopologicalSort(hashGraph map[string]graphNode) []string {
+	keys := set.New[string]()
+	for k, _ := range hashGraph {
+		keys = set.Add(keys, k)
+	}
+
+	// add vertices with no incoming edge to queue Q
+	queue := utils.Filter(keys, func(elem string) bool {
+		val, _ := hashGraph[elem]
+		return len(val.preds) == 0
+	})
+
+	list := make([]string, 0)
+
+	for len(queue) != 0 {
+		u := queue[0]
+		queue = queue[1:]
+		list = append(list, u)
+
+		toDel := make([]int, 0)
+		uNode := hashGraph[u]
+		for idx, succ := range uNode.succs {
+			toDel = append(toDel, idx)
+
+			succVal := hashGraph[succ]
+			succVal.preds = set.Remove(succVal.preds, u)
+			hashGraph[succ] = succVal
+
+			// NOTE: This might be unnecessary
+			uVal := hashGraph[u]
+			uVal.succs = set.Remove(uVal.succs, succ)
+			hashGraph[u] = uVal
+
+			if len(hashGraph[succ].preds) == 0 {
+				queue = append(queue, succ)
+			}
+		}
+	}
+
+	return list
 }

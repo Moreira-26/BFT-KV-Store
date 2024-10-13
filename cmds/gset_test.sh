@@ -16,7 +16,6 @@ do
 done
 
 echo 
-echo "Getting value of ${KEY}"
 VALUE_GET=`./sendmsg.sh "/get {\"key\": \"${KEY}\"}"`
 VALUE_READ=`echo ${VALUE_GET[@]:4} | jq`
 
