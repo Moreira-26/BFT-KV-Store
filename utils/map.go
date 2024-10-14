@@ -7,3 +7,13 @@ func Map[T, U any](ts []T, f func(T) U) []U {
 	}
 	return us
 }
+
+func Filter[T any](ts []T, f func(T) bool) []T {
+	us := make([]T, 0)
+	for i, val := range ts {
+		if f(ts[i]) {
+			us = append(us, val)
+		}
+	}
+	return us
+}
