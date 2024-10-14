@@ -17,10 +17,10 @@ const (
 	Q_CONNECT MessageHeader = "CON?" // Asks a node if he wants to connect
 	OK        MessageHeader = "R_OK"
 	NO        MessageHeader = "R_NO"
-	ERR		  MessageHeader = "R_ER"
+	ERR       MessageHeader = "R_ER"
 	MSGS      MessageHeader = "MSGS"
 	NEEDS     MessageHeader = "NEED"
-	HEADS	MessageHeader = "HEDS"
+	HEADS     MessageHeader = "HEDS"
 
 	// user api
 	API_NEW MessageHeader = "/new" // Adds a new key to the database, expects a type

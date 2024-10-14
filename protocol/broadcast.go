@@ -90,7 +90,7 @@ func BroadcastReceiver(ctx *context.AppContext) {
 				go listenToConnection(connections[name])
 
 				if !exists {
-					on_connection_to_another_replica(ctx, connections[name])
+					onConnectionToAnotherReplica(ctx, connections[name])
 				}
 
 				ctx.NewNodes = ctx.NewNodes[1:]
@@ -108,11 +108,11 @@ func BroadcastReceiver(ctx *context.AppContext) {
 
 				switch header {
 				case MSGS:
-					on_receiving_msgs(ctx, connData, payload[4:])
+					onReceivingMsgs(ctx, connData, payload[4:])
 				case NEEDS:
-					on_receiving_needs(ctx, connData, payload[4:])
+					onReceivingNeeds(ctx, connData, payload[4:])
 				case HEADS:
-					on_receiving_heads(ctx, connData, payload[4:])
+					onReceivingHeads(ctx, connData, payload[4:])
 				}
 			case <-connData.hangup:
 				delete(connections, name)
@@ -129,9 +129,7 @@ type msgsDTO struct {
 	Messages []string `json:"messages"`
 }
 
-// Algorithm 1 A Byzantine causal broadcast algorithm.
 func broadcast(ctx *context.AppContext, key string, m crdts.SignedOperation) {
-	// TODO: Add a lock here because it is atomic
 	M = set.Add(M, hex.EncodeToString(m))
 
 	msg := NewMessage(MSGS).AddContent(msgsDTO{
@@ -152,7 +150,7 @@ func broadcast(ctx *context.AppContext, key string, m crdts.SignedOperation) {
 	}
 }
 
-func on_connection_to_another_replica(ctx *context.AppContext, connData *connectionData) {
+func onConnectionToAnotherReplica(ctx *context.AppContext, connData *connectionData) {
 	// connection-local variables
 	connData.vars = &connectionVariables{
 		sent:    set.New[string](),
@@ -173,7 +171,7 @@ func on_connection_to_another_replica(ctx *context.AppContext, connData *connect
 	}
 }
 
-func on_receiving_heads(ctx *context.AppContext, connData *connectionData, body []byte) {
+func onReceivingHeads(ctx *context.AppContext, connData *connectionData, body []byte) {
 	data, err := unmarshallJson[msgsDTO](body)
 	if err != nil {
 		logger.Error("Failed to parse msgs JSON", err)
@@ -189,7 +187,7 @@ func on_receiving_heads(ctx *context.AppContext, connData *connectionData, body 
 	handleMissing(ctx, connData, key, missing)
 }
 
-func on_receiving_msgs(ctx *context.AppContext, connData *connectionData, body []byte) {
+func onReceivingMsgs(ctx *context.AppContext, connData *connectionData, body []byte) {
 	data, err := unmarshallJson[msgsDTO](body)
 	if err != nil {
 		logger.Error("Failed to parse msgs JSON", err)
@@ -229,7 +227,7 @@ func on_receiving_msgs(ctx *context.AppContext, connData *connectionData, body [
 	handleMissing(ctx, connData, data.Key, unresolved)
 }
 
-func on_receiving_needs(ctx *context.AppContext, connData *connectionData, body []byte) {
+func onReceivingNeeds(ctx *context.AppContext, connData *connectionData, body []byte) {
 	data, err := unmarshallJson[msgsDTO](body)
 	if err != nil {
 		logger.Error("Failed to parse msgs JSON", err)
@@ -265,7 +263,6 @@ func handleMissing(ctx *context.AppContext, connData *connectionData, key string
 	)
 
 	if len(connData.vars.missing) == 0 {
-		// TODO: Add lock here because it is atomic
 		msgs := set.Diff(set.FromSlice(connData.vars.recvd), M)
 
 		M = set.Union(M, connData.vars.recvd)
