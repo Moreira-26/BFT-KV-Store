@@ -47,7 +47,6 @@ func (st *Storage) Assign(key string, value crdts.SignedOperation) error {
 
 	st.data[key] = newCell
 
-
 	return nil
 }
 
@@ -113,4 +112,14 @@ func (c *StorageCell) update() {
 
 	c.heads = result.Heads
 	c.value = result.Value
+}
+
+func (st *Storage) GetHeads() map[string][]crdts.SignedOperation {
+	// This is obviously inefficient in the long run
+	// but we roll with it for now
+	heads := make(map[string][]crdts.SignedOperation)
+	for k, v := range st.data {
+		heads[k] = v.heads
+	}
+	return heads
 }

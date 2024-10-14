@@ -20,6 +20,7 @@ const (
 	ERR		  MessageHeader = "R_ER"
 	MSGS      MessageHeader = "MSGS"
 	NEEDS     MessageHeader = "NEED"
+	HEADS	MessageHeader = "HEDS"
 
 	// user api
 	API_NEW MessageHeader = "/new" // Adds a new key to the database, expects a type

@@ -27,7 +27,7 @@ func HashOperationFromString(opStr string) string {
 	return hex.EncodeToString(hash[:])
 }
 
-func HashOperation(op []byte) string {
+func HashOperation(op SignedOperation) string {
 	hash := sha256.Sum256(op)
 	return hex.EncodeToString(hash[:])
 }

@@ -43,7 +43,6 @@ func isNetConnClosedErr(err error) bool {
 	}
 }
 
-// FIXME: What if the connection ends?
 func listenToConnection(connData *connectionData) {
 	for {
 		msg, err := ReadFromConnection(connData.conn)
@@ -107,13 +106,13 @@ func BroadcastReceiver(ctx *context.AppContext) {
 
 				header := MessageHeader(payload[:4])
 
-				logger.Debug("from main:", header, "from:", name)
-
 				switch header {
 				case MSGS:
 					on_receiving_msgs(ctx, connData, payload[4:])
 				case NEEDS:
 					on_receiving_needs(ctx, connData, payload[4:])
+				case HEADS:
+					on_receiving_heads(ctx, connData, payload[4:])
 				}
 			case <-connData.hangup:
 				delete(connections, name)
@@ -148,8 +147,6 @@ func broadcast(ctx *context.AppContext, key string, m crdts.SignedOperation) {
 		if connData.conn != nil {
 			if err := msg.Send(connData.conn); err != nil {
 				logger.Alert("Failed to send Message during broadcast", err)
-			} else {
-				// logger.Debug("Sent MSGS", string(msg.content))
 			}
 		}
 	}
@@ -164,15 +161,32 @@ func on_connection_to_another_replica(ctx *context.AppContext, connData *connect
 		mconn:   M,
 	}
 
-	// TODO: Send heads
-	// send ⟨heads : heads(Mconn)⟩ via current connection
+	heads := ctx.Storage.GetHeads()
+
+	for key, hds := range heads {
+		NewMessage(HEADS).AddContent(msgsDTO{
+			Key: key,
+			Messages: utils.Map(hds, func(el crdts.SignedOperation) string {
+				return crdts.HashOperation(el)
+			}),
+		}).Send(connData.conn)
+	}
 }
 
-func on_receiving_heads() {
-	/*
-	 on receiving ⟨heads : hs⟩ via a connection do
-	 HandleMissing({ℎ ∈ hs | 𝑚 ∈ Mconn. 𝐻 (𝑚) = ℎ})
-	*/
+func on_receiving_heads(ctx *context.AppContext, connData *connectionData, body []byte) {
+	data, err := unmarshallJson[msgsDTO](body)
+	if err != nil {
+		logger.Error("Failed to parse msgs JSON", err)
+		return
+	}
+
+	key := data.Key
+	hs := set.FromSlice(data.Messages)
+
+	mConnHashes := utils.Map(connData.vars.mconn, crdts.HashOperationFromString)
+	missing := set.Diff(hs, mConnHashes)
+
+	handleMissing(ctx, connData, key, missing)
 }
 
 func on_receiving_msgs(ctx *context.AppContext, connData *connectionData, body []byte) {
@@ -273,12 +287,10 @@ func handleMissing(ctx *context.AppContext, connData *connectionData, key string
 			}
 		}
 	} else {
-		msg := NewMessage(NEEDS).AddContent(
+		NewMessage(NEEDS).AddContent(
 			msgsDTO{
 				Key:      key,
 				Messages: connData.vars.missing,
-			})
-
-		msg.Send(connData.conn)
+			}).Send(connData.conn)
 	}
 }
