@@ -186,9 +186,6 @@ func onConnectionToAnotherReplica(ctx *context.AppContext, connData *connectionD
 
 	heads := ctx.Storage.GetHeads()
 
-	// FIXME: Since this can send more than one message each time
-	// to a connection, the connection will parse it poorly,
-	// resulting in an error
 	for key, hds := range heads {
 		NewMessage(HEADS).AddContent(msgsDTO{
 			Key:      key,
@@ -284,7 +281,6 @@ func onConnectionToAnotherReplica(ctx *context.AppContext, connData *connectionD
 func onReceivingHeads(ctx *context.AppContext, connData *connectionData, body []byte) {
 	data, err := unmarshallJson[msgsDTO](body)
 	if err != nil {
-		// NOTE: Leaving this string(body) here until the problem of the protocol is solved
 		logger.Error("Failed to parse heads JSON", err, string(body))
 		return
 	}
