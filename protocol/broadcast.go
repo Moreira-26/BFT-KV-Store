@@ -12,6 +12,7 @@ import (
 	"io"
 	"net"
 	"syscall"
+	// "github.com/bits-and-blooms/bloom/v3"
 )
 
 type connectionVariables struct {
@@ -19,6 +20,7 @@ type connectionVariables struct {
 	recvd   set.Set[string]
 	missing set.Set[string]
 	mconn   set.Set[string]
+	// oldHeads set.Set[string]
 }
 
 type connectionData struct {
@@ -115,6 +117,7 @@ func BroadcastReceiver(ctx *context.AppContext) {
 					onReceivingHeads(ctx, connData, payload[4:])
 				}
 			case <-connData.hangup:
+				connData.conn.Close()
 				delete(connections, name)
 				continue
 			default:
@@ -157,20 +160,101 @@ func onConnectionToAnotherReplica(ctx *context.AppContext, connData *connectionD
 		recvd:   set.New[string](),
 		missing: set.New[string](),
 		mconn:   M,
+		// oldHeads: set.New[string](),
 	}
 
 	heads := ctx.Storage.GetHeads()
 
 	for key, hds := range heads {
 		NewMessage(HEADS).AddContent(msgsDTO{
-			Key: key,
-			Messages: utils.Map(hds, func(el crdts.SignedOperation) string {
-				return crdts.HashOperation(el)
-			}),
+			Key:      key,
+			Messages: utils.Map(hds, crdts.HashOperation),
 		}).Send(connData.conn)
 	}
 }
 
+/*
+	func onConnectionToAnotherReplicaAlg2(ctx *context.AppContext, connData *connectionData) {
+		oldHeads := set.New[string]()
+		if connData.vars != nil {
+			oldHeads = connData.vars.oldHeads
+		}
+		// connection-local variables
+		connData.vars = &connectionVariables{
+			sent:     set.New[string](),
+			recvd:    set.New[string](),
+			missing:  set.New[string](),
+			oldHeads: oldHeads,
+			mconn:    M,
+		}
+
+		// NOTE: I don't know what these parameters are, only that the first is the number of bytes
+		bloomFilter := bloom.New(1000, 4)
+		for _, head := range oldHeads {
+			headBytes, _ := hex.DecodeString(head)
+			bloomFilter.Add(headBytes)
+		}
+
+		// replace with get heads from Mconn
+		heads := utils.Map(ctx.Storage.GetHeads(), hex.EncodeToString)
+		filter := bloomFilter.BitSet().Bytes()
+
+		// send ⟨heads : heads(Mconn), oldHeads : oldHeads, filter : filter
+
+		for key, hds := range heads {
+			NewMessage(HEADS).AddContent(struct {
+				Heads    []string
+				OldHeads []string
+				Filter   []uint64
+			}{
+				Heads: heads,
+				Messages: utils.Map(hds, func(el crdts.SignedOperation) string {
+					return crdts.HashOperation(el)
+				}),
+			}).Send(connData.conn)
+		}
+	}
+
+	func messagesSince(connData *connectionData, oldHeads []string) set.Set[string] {
+		oldHeadsHashes := set.FromSlice(utils.Map(oldHeads, crdts.HashOperationFromString))
+		known := utils.Filter(connData.vars.mconn, func(elem string) bool {
+			return set.Has(oldHeadsHashes, crdts.HashOperationFromString(elem))
+		})
+
+		mConnHashMap := make(map[string]string)
+
+		utils.Map(connData.vars.mconn, func(elem string) bool {
+			mConnHashMap[crdts.HashOperationFromString(elem)] = elem
+			return true
+		})
+
+		predsOfKnown := set.New[string]()
+		predsOfKnownQueue := known
+
+		for len(predsOfKnownQueue) > 0 {
+			predToCheck := predsOfKnown[0]
+			predsOfKnown = predsOfKnown[1:]
+
+			opBytes, _ := hex.DecodeString(predToCheck)
+			op, err := crdts.ReadOperation(opBytes)
+			if err != nil {
+				continue
+			}
+
+			for _, predHash := range op.Preds {
+				val, exists := mConnHashMap[predHash]
+
+				if exists {
+					predsOfKnownQueue = append(predsOfKnownQueue, val)
+				}
+			}
+
+			set.Add(predsOfKnown, predToCheck)
+		}
+
+		return set.Diff(connData.vars.mconn, predsOfKnown)
+	}
+*/
 func onReceivingHeads(ctx *context.AppContext, connData *connectionData, body []byte) {
 	data, err := unmarshallJson[msgsDTO](body)
 	if err != nil {
@@ -237,8 +321,7 @@ func onReceivingNeeds(ctx *context.AppContext, connData *connectionData, body []
 	needs := set.FromSlice(data.Messages)
 
 	reply := utils.Filter(set.Diff(connData.vars.mconn, connData.vars.sent), func(el string) bool {
-		op, _ := hex.DecodeString(el)
-		if set.Has(needs, crdts.HashOperation(op)) {
+		if set.Has(needs, crdts.HashOperationFromString(el)) {
 			return true
 		} else {
 			return false
@@ -266,6 +349,7 @@ func handleMissing(ctx *context.AppContext, connData *connectionData, key string
 		msgs := set.Diff(set.FromSlice(connData.vars.recvd), M)
 
 		M = set.Union(M, connData.vars.recvd)
+		connData.vars.mconn = set.Union(connData.vars.mconn, connData.vars.recvd)
 
 		var orderedMsgs []string = crdts.CalculateOperationsTopologicalOrder(msgs)
 

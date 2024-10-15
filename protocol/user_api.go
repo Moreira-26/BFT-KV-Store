@@ -152,7 +152,7 @@ func getOperation(opType MessageHeader, crdtType crdts.CRDT_TYPE, secretkey ed25
 	}
 
 invalid:
-	return []byte{}, errors.New(fmt.Sprint("No operation of type", opType, "exists for the CRDT", crdtType))
+	return []byte{}, errors.New(fmt.Sprint("No operation of type ", opType, " exists for the CRDT ", crdtType))
 
 wrongValueType:
 	return []byte{}, errors.New("Provided the wrong value type for the operation")
