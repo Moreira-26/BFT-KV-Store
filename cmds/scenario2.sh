@@ -1,19 +1,20 @@
 #!/bin/bash
 
 
-KEY=`./cmds/create_counter.sh`
+KEY=`python3 ./cmds/sendcmd.py "localhost" "8089" "/new" "{\"type\": \"counter\"}"`
+KEY=`echo ${KEY[@]:4} | jq -r ".key"`
 echo "Created counter with key \"${KEY}\""
 
-./cmds/connect.sh localhost 8079
+./cmds/connect.sh localhost 8089 localhost 8079
 echo "Connected 8089 with 8079"
 
 
-echo `./sendmsg.sh "/inc {\"key\": \"${KEY}\", \"value\": 5}"`
+echo `python3 ./cmds/sendcmd.py "localhost" "8089" "/inc" "{\"key\": \"${KEY}\", \"value\": 5}"`
 
-sleep 1
+sleep 0.2
 
 echo
 echo "FROM 8089"
-echo `./sendmsg.sh "/get {\"key\": \"${KEY}\"}"`
+echo `python3 ./cmds/sendcmd.py "localhost" "8089" "/get" "{\"key\": \"${KEY}\"}"`
 echo "FROM 8079"
-echo "/get {\"key\": \"${KEY}\"}" | netcat localhost 8079
+echo `python3 ./cmds/sendcmd.py "localhost" "8079" "/get" "{\"key\": \"${KEY}\"}"`

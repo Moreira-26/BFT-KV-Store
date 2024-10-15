@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"bftkvstore/logger"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"net"
@@ -83,11 +84,7 @@ func (msg Message) Send(conn net.Conn) (e error) {
 		return msg.malformed
 	}
 
-	var payload []byte = []byte(msg.header)
-
-	payload = append(payload, msg.content...)
-
-	_, e = conn.Write(payload)
+	_, e = conn.Write(msgToProtocolMsg(msg))
 
 	return e
 }
@@ -98,4 +95,19 @@ func (msg Message) SendAwaitRead(conn net.Conn) (data []byte, e error) {
 	}
 
 	return ReadFromConnection(conn)
+}
+
+type ProtocolMessage []byte
+
+func msgToProtocolMsg(msg Message) []byte {
+	var payload []byte = []byte(msg.header)
+
+	sizebytes := make([]byte, 2)
+	binary.BigEndian.PutUint16(sizebytes, uint16(len(msg.content)))
+
+	payload = append(payload, sizebytes[0]) // left byte
+	payload = append(payload, sizebytes[1]) // right byte
+	payload = append(payload, msg.content...)
+
+	return payload
 }

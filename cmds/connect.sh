@@ -1,4 +1,4 @@
 #!/bin/bash
 
 
-./sendmsg.sh "CONN {\"Address\": \"${1}\", \"Port\": \"${2}\"}" 8089
+echo `python3 ./cmds/sendcmd.py "${1}" "${2}" "CONN" "{\"Address\": \"${3}\", \"Port\": \"${4}\"}"`

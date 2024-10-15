@@ -3,6 +3,7 @@ package protocol
 import (
 	"bftkvstore/context"
 	"bufio"
+	"encoding/binary"
 	"net"
 )
 
@@ -11,10 +12,23 @@ const READER_SIZE = 1000
 func ReadFromConnection(conn net.Conn) (msg []byte, err error) {
 	reader := bufio.NewReader(conn)
 
-	data := make([]byte, READER_SIZE)
+	headerAndSize := make([]byte, 6)
 
-	for {
+	sz, err := reader.Read(headerAndSize)
+	if err != nil || sz != 6 {
+		return nil, err
+		// NOTE: Perhaps discard the buffer
+	}
+
+	msg = append(msg, headerAndSize[0:4]...)
+
+	contentSize := int(binary.BigEndian.Uint16(headerAndSize[4:]))
+
+	for contentSize > 0 {
+		data := make([]byte, min(READER_SIZE, contentSize))
+
 		sz, err := reader.Read(data)
+		contentSize -= sz
 
 		if err != nil {
 			return nil, err
