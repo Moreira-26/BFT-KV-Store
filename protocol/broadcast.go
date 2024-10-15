@@ -11,9 +11,13 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"sync"
 	"syscall"
+	"time"
 	// "github.com/bits-and-blooms/bloom/v3"
 )
+
+const _HEADS_ROUTINE_SECONDS = 30
 
 type connectionVariables struct {
 	sent    set.Set[string]
@@ -24,13 +28,16 @@ type connectionVariables struct {
 }
 
 type connectionData struct {
-	conn   net.Conn
-	vars   *connectionVariables
-	ch     chan []byte
-	hangup chan bool
+	lHeadsMsg time.Time
+	conn      net.Conn
+	vars      *connectionVariables
+	ch        chan []byte
+	hangup    chan bool
 }
 
 var connections map[string]*connectionData = make(map[string]*connectionData)
+
+var lockM sync.Mutex
 var M set.Set[string] = set.New[string]()
 
 func isNetConnClosedErr(err error) bool {
@@ -83,10 +90,11 @@ func BroadcastReceiver(ctx *context.AppContext) {
 					connections[name] = val
 				} else {
 					connections[name] = &connectionData{
-						conn:   node.Conn,
-						vars:   nil,
-						ch:     make(chan []byte),
-						hangup: make(chan bool),
+						lHeadsMsg: time.Now(),
+						conn:      node.Conn,
+						vars:      nil,
+						ch:        make(chan []byte),
+						hangup:    make(chan bool),
 					}
 				}
 				go listenToConnection(connections[name])
@@ -124,6 +132,15 @@ func BroadcastReceiver(ctx *context.AppContext) {
 				continue
 			}
 		}
+		// gossip
+		timenow := time.Now()
+		for name, connData := range connections {
+			diff := timenow.Sub(connData.lHeadsMsg).Seconds()
+			if diff > _HEADS_ROUTINE_SECONDS {
+				logger.Debug("Routine send of heads to", name)
+				onConnectionToAnotherReplica(ctx, connData)
+			}
+		}
 	}
 }
 
@@ -133,7 +150,9 @@ type msgsDTO struct {
 }
 
 func broadcast(ctx *context.AppContext, key string, m crdts.SignedOperation) {
+	lockM.Lock()
 	M = set.Add(M, hex.EncodeToString(m))
+	lockM.Unlock()
 
 	msg := NewMessage(MSGS).AddContent(msgsDTO{
 		Key:      key,
@@ -155,6 +174,7 @@ func broadcast(ctx *context.AppContext, key string, m crdts.SignedOperation) {
 
 func onConnectionToAnotherReplica(ctx *context.AppContext, connData *connectionData) {
 	// connection-local variables
+	lockM.Lock()
 	connData.vars = &connectionVariables{
 		sent:    set.New[string](),
 		recvd:   set.New[string](),
@@ -162,15 +182,21 @@ func onConnectionToAnotherReplica(ctx *context.AppContext, connData *connectionD
 		mconn:   M,
 		// oldHeads: set.New[string](),
 	}
+	lockM.Unlock()
 
 	heads := ctx.Storage.GetHeads()
 
+	// FIXME: Since this can send more than one message each time
+	// to a connection, the connection will parse it poorly,
+	// resulting in an error
 	for key, hds := range heads {
 		NewMessage(HEADS).AddContent(msgsDTO{
 			Key:      key,
 			Messages: utils.Map(hds, crdts.HashOperation),
 		}).Send(connData.conn)
 	}
+
+	connData.lHeadsMsg = time.Now()
 }
 
 /*
@@ -258,7 +284,8 @@ func onConnectionToAnotherReplica(ctx *context.AppContext, connData *connectionD
 func onReceivingHeads(ctx *context.AppContext, connData *connectionData, body []byte) {
 	data, err := unmarshallJson[msgsDTO](body)
 	if err != nil {
-		logger.Error("Failed to parse msgs JSON", err)
+		// NOTE: Leaving this string(body) here until the problem of the protocol is solved
+		logger.Error("Failed to parse heads JSON", err, string(body))
 		return
 	}
 
@@ -314,7 +341,7 @@ func onReceivingMsgs(ctx *context.AppContext, connData *connectionData, body []b
 func onReceivingNeeds(ctx *context.AppContext, connData *connectionData, body []byte) {
 	data, err := unmarshallJson[msgsDTO](body)
 	if err != nil {
-		logger.Error("Failed to parse msgs JSON", err)
+		logger.Error("Failed to parse needs JSON", err)
 		return
 	}
 	key := data.Key
@@ -342,13 +369,16 @@ func onReceivingNeeds(ctx *context.AppContext, connData *connectionData, body []
 func handleMissing(ctx *context.AppContext, connData *connectionData, key string, hashes set.Set[string]) {
 	connData.vars.missing = set.Diff(
 		set.Union(set.FromSlice(connData.vars.missing), set.FromSlice(hashes)),
-		set.FromSlice(utils.Map[string, string](connData.vars.recvd, crdts.HashOperationFromString)),
+		set.FromSlice(utils.Map(connData.vars.recvd, crdts.HashOperationFromString)),
 	)
 
 	if len(connData.vars.missing) == 0 {
-		msgs := set.Diff(set.FromSlice(connData.vars.recvd), M)
+		lockM.Lock()
 
+		msgs := set.Diff(set.FromSlice(connData.vars.recvd), M)
 		M = set.Union(M, connData.vars.recvd)
+
+		lockM.Unlock()
 		connData.vars.mconn = set.Union(connData.vars.mconn, connData.vars.recvd)
 
 		var orderedMsgs []string = crdts.CalculateOperationsTopologicalOrder(msgs)
