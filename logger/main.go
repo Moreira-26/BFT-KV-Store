@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"sync"
 )
 
 const (
@@ -26,8 +27,10 @@ const (
 	_NOCOLOR      = "0"
 )
 
+var loggerLock sync.Mutex
+
 func withColor(color string, word string) string {
-	return fmt.Sprintf("\033[%sm%s\033[%sm", color, word, _NOCOLOR)
+	return fmt.Sprintf("\033[%sm[ %s ]\033[%sm", color, word, _NOCOLOR)
 }
 
 func print(prefix string, args ...any) {
@@ -38,30 +41,32 @@ func print(prefix string, args ...any) {
 			text = fmt.Append(text, " ")
 		}
 	}
+	loggerLock.Lock()
 	log.Println(prefix, string(text))
+	loggerLock.Unlock()
 }
 
 func Info(args ...any) {
-	print(withColor(_LIGHT_BLUE, "[INFO]"), args...)
+	print(withColor(_LIGHT_BLUE, "INFO"), args...)
 }
 
 func Error(args ...any) {
-	print(withColor(_RED, "[ERROR]"), args...)
+	print(withColor(_RED, "ERROR"), args...)
 }
 
 func Log(args ...any) {
-	print(withColor(_BLUE, "[LOG]"), args...)
+	print(withColor(_BLUE, "LOG"), args...)
 }
 
 func Debug(args ...any) {
-	print(withColor(_GREEN, "[DEBUG]"), args...)
+	print(withColor(_GREEN, "DEBUG"), args...)
 }
 
 func Alert(args ...any) {
-	print(withColor(_YELLOW, "[ALERT]"), args...)
+	print(withColor(_YELLOW, "ALERT"), args...)
 }
 
 func Fatal(args ...any) {
-	print(withColor(_PURPLE, "[FATAL]"), args...)
+	print(withColor(_PURPLE, "FATAL"), args...)
 	os.Exit(1)
 }
